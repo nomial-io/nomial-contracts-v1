@@ -1,0 +1,19 @@
+{
+  "name": "@nomial-io/nomial-contracts",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "forge build",
+    "test": "forge test"
+  },
+  "description": "Brink intents smart contracts",
+  "author": "@mikec",
+  "license": "GPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nomial-io/nomial-contracts-v1.git"
+  },
+  "dependencies": { },
+  "devDependencies": {
+    "@openzeppelin/contracts": "5.2.0"
+  }
+}
