@@ -17,14 +17,15 @@ contract InventoryPoolDeployer01 {
   error FailedToDeployPool();
 
   function poolAddress(
-    bytes32 salt,
-    IERC20 asset,
-    string memory name,
-    string memory symbol,
-    uint initAmount
+      bytes32 salt,
+      IERC20 asset,
+      string memory name,
+      string memory symbol,
+      uint initAmount,
+      address borrowController
   ) public view returns (address) {
       bytes memory bytecode = type(InventoryPool01).creationCode;
-      bytecode = abi.encodePacked(bytecode, abi.encode(asset, name, symbol, initAmount));
+      bytecode = abi.encodePacked(bytecode, abi.encode(asset, name, symbol, initAmount, borrowController));
       return poolAddressFromBytecode(salt, bytecode);
   }
 
@@ -42,10 +43,11 @@ contract InventoryPoolDeployer01 {
       IERC20 asset,
       string memory name,
       string memory symbol,
-      uint initAmount
+      uint initAmount,
+      address borrowController
   ) public returns (address poolAddress) {
       bytes memory bytecode = type(InventoryPool01).creationCode;
-      bytecode = abi.encodePacked(bytecode, abi.encode(asset, name, symbol, initAmount));
+      bytecode = abi.encodePacked(bytecode, abi.encode(asset, name, symbol, initAmount, borrowController));
       
       // transfer initial amount to this contract and approve to pool address before deployment
       address computedPoolAddress = poolAddressFromBytecode(salt, bytecode);
