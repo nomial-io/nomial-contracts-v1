@@ -17,7 +17,7 @@ contract InventoryPool01Test is Test, Helper {
     address public constant addr1 = 0x373FB35c5068f49deF8C2A74C0Fb3a82df02C667;
     address public constant addr2 = 0x5Df7C65332BB095B7b108336A4f4eC7E98D66a61;
     address public constant addr3 = 0x380f7480935b3Fb4FD604eC1Becf1361DaFD600f;
-    address public constant borrowController = 0xFD1066acf2FC47F3b2DaCec43E76321644dC9928;
+    address public constant poolOwner = 0xFD1066acf2FC47F3b2DaCec43E76321644dC9928;
     bytes32 public constant salt = hex'beb2decdc94361e6162b2139bbc95204709af34ca0a85c5bb6fde1e70e0f5c7e';
 
     function setUp () public {
@@ -26,12 +26,12 @@ contract InventoryPool01Test is Test, Helper {
 
         vm.startPrank(USDC_WHALE);
         USDC_ERC20.approve(address(inventoryPoolDeployer01), MAX_UINT);
-        usdcInventoryPool = InventoryPool01(inventoryPoolDeployer01.deploy(salt, IERC20(USDC), "nomialUSDC", "nmlUSDC", 1 * 10**5, borrowController));
+        usdcInventoryPool = InventoryPool01(inventoryPoolDeployer01.deploy(salt, IERC20(USDC), "nomialUSDC", "nmlUSDC", 1 * 10**5, poolOwner));
         vm.stopPrank();
     
         vm.startPrank(WETH_WHALE);
         WETH_ERC20.approve(address(inventoryPoolDeployer01), MAX_UINT);
-        wethInventoryPool = InventoryPool01(inventoryPoolDeployer01.deploy(salt, IERC20(WETH), "nomialWETH", "nmlWETH", 1 * 10**14, borrowController));
+        wethInventoryPool = InventoryPool01(inventoryPoolDeployer01.deploy(salt, IERC20(WETH), "nomialWETH", "nmlWETH", 1 * 10**14, poolOwner));
         vm.stopPrank();
 
         vm.prank(WETH_WHALE);

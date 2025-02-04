@@ -45,7 +45,7 @@ contract InventoryPoolDeployer01 {
       string memory symbol,
       uint initAmount,
       address borrowController
-  ) public returns (address poolAddress) {
+  ) public returns (address payable poolAddress_) {
       bytes memory bytecode = type(InventoryPool01).creationCode;
       bytecode = abi.encodePacked(bytecode, abi.encode(asset, name, symbol, initAmount, borrowController));
       
@@ -55,14 +55,14 @@ contract InventoryPoolDeployer01 {
       asset.approve(computedPoolAddress, initAmount);
 
       assembly {
-          poolAddress := create2(0, add(bytecode, 0x20), mload(bytecode), salt)
+          poolAddress_ := create2(0, add(bytecode, 0x20), mload(bytecode), salt)
       }
 
-      if (poolAddress == address(0)) {
+      if (poolAddress_ == address(0)) {
         revert FailedToDeployPool();
       }
 
-      emit PoolDeployed(poolAddress);
+      emit PoolDeployed(poolAddress_);
   }
 
 }
