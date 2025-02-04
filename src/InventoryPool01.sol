@@ -10,6 +10,7 @@ error NotSupported();
 error Expired();
 error NoDebt();
 error ZeroRepayment();
+error InsufficientLiquidity();
 
 struct BorrowerData {
     uint scaledDebt;
@@ -120,6 +121,23 @@ contract InventoryPool01 is ERC4626, Ownable {
             borrowers[borrower].penaltyCounterStart = block.timestamp - period_ + paymentRatio_.mulDiv(period_, 1e27);
             IERC20(asset()).transferFrom(msg.sender, address(this), baseDebtPayment_);
         }
+    }
+
+    function totalAssets() public view override returns (uint256) {
+        return globalDebt() + IERC20(asset()).balanceOf(address(this));
+    }
+
+    function _withdraw(
+        address caller,
+        address receiver,
+        address owner,
+        uint256 assets,
+        uint256 shares
+    ) internal override {
+        if (assets > IERC20(asset()).balanceOf(address(this))) {
+            revert InsufficientLiquidity();
+        }
+        ERC4626._withdraw(caller, receiver, owner, assets, shares);
     }
 
     function baseFee() public view returns (uint) {
