@@ -71,20 +71,20 @@ contract InventoryPool01 is ERC4626, Ownable {
     }
 
     function borrow(uint amount, address borrower, address recipient, uint expiryTime) public onlyOwner() {
-      if (expiryTime <= block.timestamp) {
-        revert Expired();
-      }
+        if (expiryTime <= block.timestamp) {
+            revert Expired();
+        }
 
-      _updateAccumulatedInterestFactor();
+        _updateAccumulatedInterestFactor();
 
-      uint scaledDebt = amount.mulDiv(1e27, accumulatedInterestFactor_) + amount.mulDiv(baseFee(), 1e27);
-      borrowers[borrower].scaledDebt += scaledDebt;
-      globalScaledDebt += scaledDebt;
-      if (borrowers[borrower].penaltyCounterStart == 0) {
-        borrowers[borrower].penaltyCounterStart = block.timestamp;
-      }
+        uint scaledDebt = amount.mulDiv(1e27, accumulatedInterestFactor_) + amount.mulDiv(baseFee(), 1e27);
+        borrowers[borrower].scaledDebt += scaledDebt;
+        globalScaledDebt += scaledDebt;
+        if (borrowers[borrower].penaltyCounterStart == 0) {
+            borrowers[borrower].penaltyCounterStart = block.timestamp;
+        }
 
-      IERC20(asset()).transfer(recipient, amount);
+        IERC20(asset()).transfer(recipient, amount);
     }
 
     function repay(uint amount, address borrower) public {
