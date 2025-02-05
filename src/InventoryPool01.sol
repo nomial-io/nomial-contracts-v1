@@ -127,19 +127,6 @@ contract InventoryPool01 is ERC4626, Ownable {
         return globalDebt() + IERC20(asset()).balanceOf(address(this));
     }
 
-    function _withdraw(
-        address caller,
-        address receiver,
-        address owner,
-        uint256 assets,
-        uint256 shares
-    ) internal override {
-        if (assets > IERC20(asset()).balanceOf(address(this))) {
-            revert InsufficientLiquidity();
-        }
-        ERC4626._withdraw(caller, receiver, owner, assets, shares);
-    }
-
     function baseFee() public view returns (uint) {
         return baseFee_;
     }
@@ -182,6 +169,24 @@ contract InventoryPool01 is ERC4626, Ownable {
         return 0;
     }
 
+    function _withdraw(
+        address caller,
+        address receiver,
+        address owner,
+        uint256 assets,
+        uint256 shares
+    ) internal override {
+        if (assets > IERC20(asset()).balanceOf(address(this))) {
+            revert InsufficientLiquidity();
+        }
+        ERC4626._withdraw(caller, receiver, owner, assets, shares);
+    }
+
+    function _updateAccumulatedInterestFactor () internal {
+        accumulatedInterestFactor_ = _accumulatedInterestFactor();
+        lastAccumulatedInterestUpdate = block.timestamp;
+    }
+
     function _baseDebt(address borrower, uint accInterestFactor) internal view returns (uint) {
         return borrowers[borrower].scaledDebt.mulDiv(accInterestFactor, 1e27);
     }
@@ -193,11 +198,6 @@ contract InventoryPool01 is ERC4626, Ownable {
             // newFactor = oldFactor * (1 + ratePerSecond * secondsSinceLastUpdate)
             return accumulatedInterestFactor_.mulDiv(1e27 + interestRate() * (block.timestamp - lastAccumulatedInterestUpdate), 1e27);
         }
-    }
-
-    function _updateAccumulatedInterestFactor () internal {
-        accumulatedInterestFactor_ = _accumulatedInterestFactor();
-        lastAccumulatedInterestUpdate = block.timestamp;
     }
 
     receive() external payable {
