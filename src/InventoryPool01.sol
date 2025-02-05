@@ -77,9 +77,9 @@ contract InventoryPool01 is ERC4626, Ownable {
 
         _updateAccumulatedInterestFactor();
 
-        uint scaledDebt = amount.mulDiv(1e27, accumulatedInterestFactor_) + amount.mulDiv(baseFee(), 1e27);
-        borrowers[borrower].scaledDebt += scaledDebt;
-        globalScaledDebt += scaledDebt;
+        uint scaledDebt_ = amount.mulDiv(1e27, accumulatedInterestFactor_) + amount.mulDiv(baseFee(), 1e27);
+        borrowers[borrower].scaledDebt += scaledDebt_;
+        globalScaledDebt += scaledDebt_;
         if (borrowers[borrower].penaltyCounterStart == 0) {
             borrowers[borrower].penaltyCounterStart = block.timestamp;
         }
@@ -114,13 +114,18 @@ contract InventoryPool01 is ERC4626, Ownable {
         
         if (baseDebtPayment_ >= baseDebt_) {
             borrowers[borrower].penaltyCounterStart = 0;
-            IERC20(asset()).transferFrom(msg.sender, address(this), baseDebt_);
+            baseDebtPayment_ = baseDebt_;
         } else {
             uint period_ = penaltyPeriod();
             uint paymentRatio_ = baseDebtPayment_.mulDiv(1e27, baseDebt_);
             borrowers[borrower].penaltyCounterStart = block.timestamp - period_ + paymentRatio_.mulDiv(period_, 1e27);
-            IERC20(asset()).transferFrom(msg.sender, address(this), baseDebtPayment_);
         }
+
+        uint scaledDebt_ = baseDebtPayment_.mulDiv(1e27, accumulatedInterestFactor_);
+        borrowers[borrower].scaledDebt -= scaledDebt_;
+        globalScaledDebt -= scaledDebt_;
+
+        IERC20(asset()).transferFrom(msg.sender, address(this), baseDebtPayment_);
     }
 
     function totalAssets() public view override returns (uint256) {
