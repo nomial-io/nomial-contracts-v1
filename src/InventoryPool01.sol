@@ -110,7 +110,7 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01 {
         IERC20(asset()).transferFrom(msg.sender, address(this), baseDebtPayment_);
     }
 
-    function overrideBorrowerDebt (uint scaledDebt, address borrower, uint penaltyCounterStart, uint penaltyDebtPaid) public onlyOwner() {
+    function setBorrowerDebt (uint scaledDebt, address borrower, uint penaltyCounterStart, uint penaltyDebtPaid) public onlyOwner() {
         BorrowerData storage b = borrowers[borrower];
         int debtDiff = int(scaledDebt) - int(b.scaledDebt);
         b.scaledDebt = scaledDebt;
@@ -118,6 +118,10 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01 {
 
         b.penaltyCounterStart = penaltyCounterStart;
         b.penaltyDebtPaid = penaltyDebtPaid;
+    }
+
+    function setParamsContract (address params_) public onlyOwner() {
+        params = IInventoryPoolParams01(params_);
     }
 
     function totalAssets() public view override(ERC4626, IInventoryPool01) returns (uint) {
