@@ -7,7 +7,7 @@ import {IInventoryPoolParams01} from "./IInventoryPoolParams01.sol";
 interface IInventoryPool01 {
     function borrow(uint amount, address borrower, address recipient, uint expiryTime) external;
     function repay(uint amount, address borrower) external;
-    function setBorrowerDebt (uint scaledDebt, address borrower, uint penaltyCounterStart, uint penaltyDebtPaid) external;
+    function absolvePenalty (address borrower) external;
     function setParamsContract (address params_) external;
 
     function totalAssets() external view returns (uint);

@@ -110,14 +110,10 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01 {
         IERC20(asset()).transferFrom(msg.sender, address(this), baseDebtPayment_);
     }
 
-    function setBorrowerDebt (uint scaledDebt, address borrower, uint penaltyCounterStart, uint penaltyDebtPaid) public onlyOwner() {
+    function absolvePenalty (address borrower) public onlyOwner() {
         BorrowerData storage b = borrowers[borrower];
-        int debtDiff = int(scaledDebt) - int(b.scaledDebt);
-        b.scaledDebt = scaledDebt;
-        scaledReceivables = uint(int(scaledReceivables) + debtDiff);
-
-        b.penaltyCounterStart = penaltyCounterStart;
-        b.penaltyDebtPaid = penaltyDebtPaid;
+        b.penaltyCounterStart = 0;
+        b.penaltyDebtPaid = 0;
     }
 
     function setParamsContract (address params_) public onlyOwner() {
