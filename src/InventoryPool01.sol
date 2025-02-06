@@ -30,7 +30,7 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01 {
     IInventoryPoolParams01 public params;
     uint public storedAccInterestFactor;
     uint public lastAccumulatedInterestUpdate;
-    uint public globalScaledDebt;
+    uint public scaledReceivables;
 
     mapping(address => BorrowerData) public borrowers;
 
@@ -61,7 +61,7 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01 {
 
         uint scaledDebt_ = amount.mulDiv(1e27, storedAccInterestFactor) + amount.mulDiv(params.baseFee(), 1e27);
         borrowers[borrower].scaledDebt += scaledDebt_;
-        globalScaledDebt += scaledDebt_;
+        scaledReceivables += scaledDebt_;
         if (borrowers[borrower].penaltyCounterStart == 0) {
             borrowers[borrower].penaltyCounterStart = block.timestamp;
         }
@@ -105,7 +105,7 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01 {
 
         uint scaledDebt_ = baseDebtPayment_.mulDiv(1e27, storedAccInterestFactor);
         borrowers[borrower].scaledDebt -= scaledDebt_;
-        globalScaledDebt -= scaledDebt_;
+        scaledReceivables -= scaledDebt_;
 
         IERC20(asset()).transferFrom(msg.sender, address(this), baseDebtPayment_);
     }
@@ -114,7 +114,7 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01 {
         BorrowerData storage b = borrowers[borrower];
         int debtDiff = int(scaledDebt) - int(b.scaledDebt);
         b.scaledDebt = scaledDebt;
-        globalScaledDebt = uint(int(globalScaledDebt) + debtDiff);
+        scaledReceivables = uint(int(scaledReceivables) + debtDiff);
 
         b.penaltyCounterStart = penaltyCounterStart;
         b.penaltyDebtPaid = penaltyDebtPaid;
@@ -125,11 +125,11 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01 {
     }
 
     function totalAssets() public view override(ERC4626, IInventoryPool01) returns (uint) {
-        return globalDebt() + IERC20(asset()).balanceOf(address(this));
+        return receivables() + IERC20(asset()).balanceOf(address(this));
     }
 
-    function globalDebt() public view returns (uint) {
-        return globalScaledDebt.mulDiv(accumulatedInterestFactor(), 1e27);
+    function receivables() public view returns (uint) {
+        return scaledReceivables.mulDiv(accumulatedInterestFactor(), 1e27);
     }
 
     function baseDebt(address borrower) public view returns (uint) {
