@@ -18,6 +18,23 @@ contract InventoryPoolDeployer01Test is Test, Helper {
     }
 
     function testInventoryPoolDeployer01_poolAddress () public {
+
+        /*
+            // 1 bps (0.01 %)
+            baseFee_ = 1 * 1e23;
+
+            // 5% annual rate, per second
+            // 5 * 1e25 / (60 * 60 * 24 * 365)
+            interestRate_ = 1585489599188229400;
+
+            // 500% annual penalty rate, per second
+            // 500 * 1e25 / (60 * 60 * 24 * 365)
+            penaltyRate_ = 158548959918822932521;
+
+            // 24 hour penalty period, in seconds
+            penaltyPeriod_ = 86400;
+        */
+
         vm.prank(WETH_WHALE);
         address computedAddr = inventoryPoolDeployer01.poolAddress(salt, IERC20(WETH), "nomialWETH", "nmlWETH", 0, borrowController);
         address actualAddr = inventoryPoolDeployer01.deploy(salt, IERC20(WETH), "nomialWETH", "nmlWETH", 0, borrowController);

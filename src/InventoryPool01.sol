@@ -5,6 +5,8 @@ pragma solidity ^0.8.20;
 import {ERC4626, IERC20, ERC20} from "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {IInventoryPool01} from "./interfaces/IInventoryPool01.sol";
+import {IInventoryPoolParams01} from "./interfaces/IInventoryPoolParams01.sol";
 
 error NotSupported();
 error Expired();
@@ -22,22 +24,13 @@ struct BorrowerData {
  * @dev ...
  * ...
  */
-contract InventoryPool01 is ERC4626, Ownable {
+contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01 {
     using Math for uint256;
 
-    /* The initial fee for borrows. A fixed percentage expressed in 1e27 */
-    uint public baseFee_;
-
-    /* Time-based rate for interest on borrows. Rate is per-second expressed in 1e27 */
-    uint private interestRate_;
-
-    uint private penaltyRate_;
-    uint private penaltyPeriod_;
-
-    uint private accumulatedInterestFactor_;
-
-    uint private globalScaledDebt;
-    uint private lastAccumulatedInterestUpdate;
+    IInventoryPoolParams01 public params;
+    uint public storedAccInterestFactor;
+    uint public lastAccumulatedInterestUpdate;
+    uint public globalScaledDebt;
 
     mapping(address => BorrowerData) public borrowers;
 
@@ -46,7 +39,8 @@ contract InventoryPool01 is ERC4626, Ownable {
         string memory name,
         string memory symbol,
         uint initAmount,
-        address owner
+        address owner,
+        IInventoryPoolParams01 _params
     ) ERC4626(IERC20(asset)) ERC20(name, symbol) Ownable(owner) {
         /**
          * deployer is responsible for burning a small deposit to mitigate inflation attack.
@@ -55,19 +49,7 @@ contract InventoryPool01 is ERC4626, Ownable {
          */
         deposit(initAmount, 0x000000000000000000000000000000000000dEaD);
 
-        // 1 bps (0.01 %)
-        baseFee_ = 1 * 1e23;
-
-        // 5% annual rate, per second
-        // 5 * 1e25 / (60 * 60 * 24 * 365)
-        interestRate_ = 1585489599188229400;
-
-        // 500% annual penalty rate, per second
-        // 500 * 1e25 / (60 * 60 * 24 * 365)
-        penaltyRate_ = 158548959918822932521;
-
-        // 24 hour penalty period, in seconds
-        penaltyPeriod_ = 86400;
+        params = _params;
     }
 
     function borrow(uint amount, address borrower, address recipient, uint expiryTime) public onlyOwner() {
@@ -77,7 +59,7 @@ contract InventoryPool01 is ERC4626, Ownable {
 
         _updateAccumulatedInterestFactor();
 
-        uint scaledDebt_ = amount.mulDiv(1e27, accumulatedInterestFactor_) + amount.mulDiv(baseFee(), 1e27);
+        uint scaledDebt_ = amount.mulDiv(1e27, storedAccInterestFactor) + amount.mulDiv(params.baseFee(), 1e27);
         borrowers[borrower].scaledDebt += scaledDebt_;
         globalScaledDebt += scaledDebt_;
         if (borrowers[borrower].penaltyCounterStart == 0) {
@@ -94,7 +76,7 @@ contract InventoryPool01 is ERC4626, Ownable {
 
         _updateAccumulatedInterestFactor();
 
-        uint baseDebt_ = _baseDebt(borrower, accumulatedInterestFactor_);
+        uint baseDebt_ = _baseDebt(borrower, storedAccInterestFactor);
         if (baseDebt_ == 0) {
             revert NoDebt();
         }
@@ -116,12 +98,12 @@ contract InventoryPool01 is ERC4626, Ownable {
             borrowers[borrower].penaltyCounterStart = 0;
             baseDebtPayment_ = baseDebt_;
         } else {
-            uint period_ = penaltyPeriod();
+            uint period_ = params.penaltyPeriod();
             uint paymentRatio_ = baseDebtPayment_.mulDiv(1e27, baseDebt_);
             borrowers[borrower].penaltyCounterStart = block.timestamp - period_ + paymentRatio_.mulDiv(period_, 1e27);
         }
 
-        uint scaledDebt_ = baseDebtPayment_.mulDiv(1e27, accumulatedInterestFactor_);
+        uint scaledDebt_ = baseDebtPayment_.mulDiv(1e27, storedAccInterestFactor);
         borrowers[borrower].scaledDebt -= scaledDebt_;
         globalScaledDebt -= scaledDebt_;
 
@@ -138,50 +120,43 @@ contract InventoryPool01 is ERC4626, Ownable {
         b.penaltyDebtPaid = penaltyDebtPaid;
     }
 
-    function totalAssets() public view override returns (uint256) {
+    function totalAssets() public view override(ERC4626, IInventoryPool01) returns (uint) {
         return globalDebt() + IERC20(asset()).balanceOf(address(this));
     }
 
-    function baseFee() public view returns (uint) {
-        return baseFee_;
-    }
-
-    function interestRate() public view returns (uint) {
-        return interestRate_;
-    }
-
-    function penaltyRate() public view returns (uint) {
-        return penaltyRate_;
-    }
-
-    function penaltyPeriod() public view returns (uint) {
-        return penaltyPeriod_;
-    }
-
     function globalDebt() public view returns (uint) {
-        return globalScaledDebt.mulDiv(_accumulatedInterestFactor(), 1e27);
+        return globalScaledDebt.mulDiv(accumulatedInterestFactor(), 1e27);
     }
 
     function baseDebt(address borrower) public view returns (uint) {
-        return _baseDebt(borrower, _accumulatedInterestFactor());
+        return _baseDebt(borrower, accumulatedInterestFactor());
     }
 
     function penaltyDebt(address borrower) public view returns (uint) {
         uint penaltyTime_ = penaltyTime(borrower);
         if (penaltyTime_ == 0) return 0;
 
-        return penaltyTime_.mulDiv(penaltyRate(), 1e27) - borrowers[borrower].penaltyDebtPaid;
+        return penaltyTime_.mulDiv(params.penaltyRate(), 1e27) - borrowers[borrower].penaltyDebtPaid;
     }
 
     function penaltyTime(address borrower) public view returns (uint) {
         uint penaltyCounterStart = borrowers[borrower].penaltyCounterStart;
         if (penaltyCounterStart > 0) {
-            uint penaltyCounterEnd = penaltyCounterStart + penaltyPeriod();
+            uint penaltyCounterEnd = penaltyCounterStart + params.penaltyPeriod();
             if (penaltyCounterEnd < block.timestamp) {
                 return block.timestamp - penaltyCounterEnd;
             }
         }
         return 0;
+    }
+
+    function accumulatedInterestFactor() public view returns (uint) {
+        if (storedAccInterestFactor == 0) {
+            return 1e27;
+        } else {
+            // newFactor = oldFactor * (1 + ratePerSecond * secondsSinceLastUpdate)
+            return storedAccInterestFactor.mulDiv(1e27 + params.interestRate() * (block.timestamp - lastAccumulatedInterestUpdate), 1e27);
+        }
     }
 
     function _withdraw(
@@ -198,21 +173,12 @@ contract InventoryPool01 is ERC4626, Ownable {
     }
 
     function _updateAccumulatedInterestFactor () internal {
-        accumulatedInterestFactor_ = _accumulatedInterestFactor();
+        storedAccInterestFactor = accumulatedInterestFactor();
         lastAccumulatedInterestUpdate = block.timestamp;
     }
 
     function _baseDebt(address borrower, uint accInterestFactor) internal view returns (uint) {
         return borrowers[borrower].scaledDebt.mulDiv(accInterestFactor, 1e27);
-    }
-
-    function _accumulatedInterestFactor() internal view returns (uint) {
-        if (accumulatedInterestFactor_ == 0) {
-            return 1e27;
-        } else {
-            // newFactor = oldFactor * (1 + ratePerSecond * secondsSinceLastUpdate)
-            return accumulatedInterestFactor_.mulDiv(1e27 + interestRate() * (block.timestamp - lastAccumulatedInterestUpdate), 1e27);
-        }
     }
 
     receive() external payable {
