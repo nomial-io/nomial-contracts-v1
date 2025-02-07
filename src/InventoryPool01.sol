@@ -27,7 +27,7 @@ struct BorrowerData {
  * @dev ...
  * ...
  */
- // TODO: need fallback guard
+ // TODO: need fallback guard!
 contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01 {
     using Math for uint256;
 
@@ -39,13 +39,13 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01 {
     mapping(address => BorrowerData) public borrowers;
 
     constructor(
-        IERC20 asset,
+        IERC20 asset_,
         string memory name,
         string memory symbol,
         uint initAmount,
         address owner,
         bytes memory paramsInitData
-    ) ERC4626(IERC20(asset)) ERC20(name, symbol) Ownable(owner) {
+    ) ERC4626(IERC20(asset_)) ERC20(name, symbol) Ownable(owner) {
         /**
          * deployer is responsible for burning a small deposit to mitigate inflation attack.
          * this ERC4626 implementation uses offset to make inflation attack un-profitable
