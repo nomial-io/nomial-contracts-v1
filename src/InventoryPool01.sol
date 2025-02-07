@@ -6,8 +6,11 @@ import {ERC4626, IERC20, ERC20} from "@openzeppelin/contracts/token/ERC20/extens
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {IInventoryPool01} from "./interfaces/IInventoryPool01.sol";
-import {IInventoryPoolParams01} from "./interfaces/IInventoryPoolParams01.sol";
+import {InventoryPoolParams01} from "./InventoryPoolParams01.sol";
 
+event InventoryPoolParamsDeployed(address inventoryPoolParams);
+
+error FailedToDeployInventoryPoolParams();
 error NotSupported();
 error Expired();
 error NoDebt();
@@ -27,7 +30,7 @@ struct BorrowerData {
 contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01 {
     using Math for uint256;
 
-    IInventoryPoolParams01 public params;
+    InventoryPoolParams01 public params;
     uint public storedAccInterestFactor;
     uint public lastAccumulatedInterestUpdate;
     uint public scaledReceivables;
@@ -40,7 +43,7 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01 {
         string memory symbol,
         uint initAmount,
         address owner,
-        IInventoryPoolParams01 _params
+        bytes memory paramsInitData
     ) ERC4626(IERC20(asset)) ERC20(name, symbol) Ownable(owner) {
         /**
          * deployer is responsible for burning a small deposit to mitigate inflation attack.
@@ -49,7 +52,20 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01 {
          */
         deposit(initAmount, 0x000000000000000000000000000000000000dEaD);
 
-        params = _params;
+        bytes memory bytecode = type(InventoryPoolParams01).creationCode;
+        bytecode = abi.encodePacked(bytecode, abi.encode(owner, address(this), paramsInitData));
+        address paramsAddr_;
+        assembly {
+            paramsAddr_ := create2(0, add(bytecode, 0x20), mload(bytecode), 0)
+        }
+
+        if (paramsAddr_ == address(0)) {
+            revert FailedToDeployInventoryPoolParams();
+        }
+
+        params = InventoryPoolParams01(paramsAddr_);
+
+        emit InventoryPoolParamsDeployed(paramsAddr_);
     }
 
     function borrow(uint amount, address borrower, address recipient, uint expiryTime) public onlyOwner() {
@@ -116,8 +132,8 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01 {
         b.penaltyDebtPaid = 0;
     }
 
-    function setParamsContract (address params_) public onlyOwner() {
-        params = IInventoryPoolParams01(params_);
+    function upgrageParamsContract (address params_) public onlyOwner() {
+        params = InventoryPoolParams01(params_);
     }
 
     function totalAssets() public view override(ERC4626, IInventoryPool01) returns (uint) {

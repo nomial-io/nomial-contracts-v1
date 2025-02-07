@@ -8,7 +8,7 @@ interface IInventoryPool01 {
     function borrow(uint amount, address borrower, address recipient, uint expiryTime) external;
     function repay(uint amount, address borrower) external;
     function absolvePenalty (address borrower) external;
-    function setParamsContract (address params_) external;
+    function upgrageParamsContract (address params_) external;
 
     function totalAssets() external view returns (uint);
     function receivables() external view returns (uint);

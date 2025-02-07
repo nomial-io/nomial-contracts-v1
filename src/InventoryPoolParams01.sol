@@ -22,13 +22,13 @@ contract InventoryPoolParams01 is Ownable, IInventoryPoolParams01 {
 
     constructor(
         address owner_,
-        IInventoryPool01 inventoryPool_,
-        uint baseFee_,
-        uint interestRate_,
-        uint penaltyRate_,
-        uint penaltyPeriod_
+        address inventoryPool_,
+        bytes memory initData
     ) Ownable(owner_) {
-        _inventoryPool = inventoryPool_;
+        _inventoryPool = IInventoryPool01(inventoryPool_);
+
+        (uint baseFee_, uint interestRate_, uint penaltyRate_, uint penaltyPeriod_) = abi.decode(initData, (uint, uint, uint, uint));
+
         _baseFee = baseFee_;
         _interestRate = interestRate_;
         _penaltyRate = penaltyRate_;

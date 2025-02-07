@@ -24,14 +24,20 @@ contract InventoryPool01Test is Test, Helper {
         setupAll();
         inventoryPoolDeployer01 = new InventoryPoolDeployer01();
 
+        bytes memory paramsInitData = abi.encode(defaultBaseFee, defaultInterestRate, defaultPenaltyRate, defaultPenaltyPeriod);
+
         vm.startPrank(USDC_WHALE);
         USDC_ERC20.approve(address(inventoryPoolDeployer01), MAX_UINT);
-        usdcInventoryPool = InventoryPool01(payable(inventoryPoolDeployer01.deploy(salt, IERC20(USDC), "nomialUSDC", "nmlUSDC", 1 * 10**5, poolOwner)));
+        usdcInventoryPool = InventoryPool01(payable(
+            inventoryPoolDeployer01.deploy(salt, IERC20(USDC), "nomialUSDC", "nmlUSDC", 1 * 10**5, poolOwner, paramsInitData)
+        ));
         vm.stopPrank();
     
         vm.startPrank(WETH_WHALE);
         WETH_ERC20.approve(address(inventoryPoolDeployer01), MAX_UINT);
-        wethInventoryPool = InventoryPool01(payable(inventoryPoolDeployer01.deploy(salt, IERC20(WETH), "nomialWETH", "nmlWETH", 1 * 10**14, poolOwner)));
+        wethInventoryPool = InventoryPool01(payable(
+            inventoryPoolDeployer01.deploy(salt, IERC20(WETH), "nomialWETH", "nmlWETH", 1 * 10**14, poolOwner, paramsInitData)
+        ));
         vm.stopPrank();
 
         vm.prank(WETH_WHALE);

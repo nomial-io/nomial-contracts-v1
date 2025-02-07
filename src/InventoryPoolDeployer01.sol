@@ -19,13 +19,14 @@ contract InventoryPoolDeployer01 {
   function poolAddress(
       bytes32 salt,
       IERC20 asset,
-      string memory name,
-      string memory symbol,
+      string calldata name,
+      string calldata symbol,
       uint initAmount,
-      address borrowController
+      address owner,
+      bytes calldata paramsInitData
   ) public view returns (address) {
       bytes memory bytecode = type(InventoryPool01).creationCode;
-      bytecode = abi.encodePacked(bytecode, abi.encode(asset, name, symbol, initAmount, borrowController));
+      bytecode = abi.encodePacked(bytecode, abi.encode(asset, name, symbol, initAmount, owner, paramsInitData));
       return poolAddressFromBytecode(salt, bytecode);
   }
 
@@ -41,13 +42,14 @@ contract InventoryPoolDeployer01 {
   function deploy(
       bytes32 salt,
       IERC20 asset,
-      string memory name,
-      string memory symbol,
+      string calldata name,
+      string calldata symbol,
       uint initAmount,
-      address borrowController
+      address owner,
+      bytes calldata paramsInitData
   ) public returns (address payable poolAddress_) {
       bytes memory bytecode = type(InventoryPool01).creationCode;
-      bytecode = abi.encodePacked(bytecode, abi.encode(asset, name, symbol, initAmount, borrowController));
+      bytecode = abi.encodePacked(bytecode, abi.encode(asset, name, symbol, initAmount, owner, paramsInitData));
       
       // transfer initial amount to this contract and approve to pool address before deployment
       address computedPoolAddress = poolAddressFromBytecode(salt, bytecode);
