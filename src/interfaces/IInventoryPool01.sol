@@ -11,7 +11,8 @@ interface IInventoryPool01 {
     function upgrageParamsContract (address params_) external;
 
     function totalAssets() external view returns (uint);
-    function receivables() external view returns (uint);
+    function totalReceivables() external view returns (uint);
+    function utilizationRate() external view returns (uint);
     function baseDebt(address borrower) external view returns (uint);
     function penaltyDebt(address borrower) external view returns (uint);
     function penaltyTime(address borrower) external view returns (uint);

@@ -27,6 +27,7 @@ struct BorrowerData {
  * @dev ...
  * ...
  */
+ // TODO: need fallback guard
 contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01 {
     using Math for uint256;
 
@@ -137,11 +138,17 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01 {
     }
 
     function totalAssets() public view override(ERC4626, IInventoryPool01) returns (uint) {
-        return receivables() + IERC20(asset()).balanceOf(address(this));
+        return totalReceivables() + IERC20(asset()).balanceOf(address(this));
     }
 
-    function receivables() public view returns (uint) {
+    function totalReceivables() public view returns (uint) {
         return scaledReceivables.mulDiv(accumulatedInterestFactor(), 1e27);
+    }
+
+    function utilizationRate() public view returns (uint) {
+        uint totalReceivables_ = totalReceivables();
+        uint totalAssets_ = totalReceivables_ + IERC20(asset()).balanceOf(address(this));
+        return totalReceivables_.mulDiv(1e27, totalAssets_);
     }
 
     function baseDebt(address borrower) public view returns (uint) {
