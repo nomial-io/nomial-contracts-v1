@@ -16,7 +16,10 @@ contract InventoryPoolParams01 is Ownable, IInventoryPoolParams01 {
 
     IInventoryPool01 private _inventoryPool;
     uint private _baseFee;
-    uint private _interestRate;
+    uint private _baseRate;
+    uint private _rate1;
+    uint private _rate2;
+    uint private _optimalUtilizationRate;
     uint private _penaltyRate;
     uint private _penaltyPeriod;
 
@@ -27,10 +30,21 @@ contract InventoryPoolParams01 is Ownable, IInventoryPoolParams01 {
     ) Ownable(owner_) {
         _inventoryPool = IInventoryPool01(inventoryPool_);
 
-        (uint baseFee_, uint interestRate_, uint penaltyRate_, uint penaltyPeriod_) = abi.decode(initData, (uint, uint, uint, uint));
+        (
+            uint baseFee_,
+            uint baseRate_,
+            uint rate1_,
+            uint rate2_,
+            uint optimalUtilizationRate_,
+            uint penaltyRate_,
+            uint penaltyPeriod_
+        ) = abi.decode(initData, (uint, uint, uint, uint, uint, uint, uint));
 
         _baseFee = baseFee_;
-        _interestRate = interestRate_;
+        _baseRate = baseRate_;
+        _rate1 = rate1_;
+        _rate2 = rate2_;
+        _optimalUtilizationRate = optimalUtilizationRate_;
         _penaltyRate = penaltyRate_;
         _penaltyPeriod = penaltyPeriod_;
     }
@@ -44,9 +58,14 @@ contract InventoryPoolParams01 is Ownable, IInventoryPoolParams01 {
         return _baseFee;
     }
 
-    /* Rate for interest on borrows. Rate is per-second expressed in 1e27 */
-    function interestRate() external view returns (uint){
-        return _interestRate;
+    /* Rate for interest on borrows. Rate is per-second expressed in 1e27. Based on Aave v3 formula for utilization-based variable interest rate */
+    function interestRate() external view returns (uint interestRate_){
+        uint utilizationRate_ = _inventoryPool.utilizationRate();
+        if (utilizationRate_ <= _optimalUtilizationRate) {
+            interestRate_ = _baseRate + utilizationRate_.mulDiv(1e27, _optimalUtilizationRate) * _rate1;
+        } else {
+            interestRate_ = _baseRate + _rate1 + (utilizationRate_ - _optimalUtilizationRate).mulDiv(1e27, (1e27 - _optimalUtilizationRate)) * _rate2;
+        }
     }
 
     /* Rate for interest after penalty period. Penalty rate is in addition to interest rate. Rate is per-second expressed in 1e27 */

@@ -25,9 +25,22 @@ contract Helper is Test {
     // 1 bps (0.01 %)
     uint public defaultBaseFee = 1 * 1e23;
 
-    // 5% annual rate, per second
-    // 5 * 1e25 / (60 * 60 * 24 * 365)
-    uint public defaultInterestRate = 1585489599188229400;
+    // utilization-based interest rate params, modeled from Aave V3's USDC pool
+
+    // 0% base rate
+    uint public defaultBaseRate = 0;
+
+    // 11.5% annual rate1 (per-second)
+    // 115 * 1e24 / (60 * 60 * 24 * 365)
+    uint public defaultRate1 = 3646626078132927500;
+
+    // 46.5% annual rate2 (per-second)
+    // 465 * 1e24 / (60 * 60 * 24 * 365)
+    uint public defaultRate2 = 14745053272450533000;
+
+    // 92% optimal utilization rate
+    // 92 * 1e25
+    uint public defaultOptimalUtilizationRate = 920000000000000000000000000;
 
     // 500% annual penalty rate, per second
     // 500 * 1e25 / (60 * 60 * 24 * 365)

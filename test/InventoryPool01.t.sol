@@ -24,7 +24,15 @@ contract InventoryPool01Test is Test, Helper {
         setupAll();
         inventoryPoolDeployer01 = new InventoryPoolDeployer01();
 
-        bytes memory paramsInitData = abi.encode(defaultBaseFee, defaultInterestRate, defaultPenaltyRate, defaultPenaltyPeriod);
+        bytes memory paramsInitData = abi.encode(
+            defaultBaseFee,
+            defaultBaseRate,
+            defaultRate1,
+            defaultRate2,
+            defaultOptimalUtilizationRate,
+            defaultPenaltyRate,
+            defaultPenaltyPeriod
+        );
 
         vm.startPrank(USDC_WHALE);
         USDC_ERC20.approve(address(inventoryPoolDeployer01), MAX_UINT);
