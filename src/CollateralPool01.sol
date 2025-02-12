@@ -34,7 +34,7 @@ contract CollateralPool01 is Ownable, ReentrancyGuardTransient {
     using SafeERC20 for IERC20;
 
     uint public withdrawPeriod;
-    mapping(address => mapping(IERC20 => uint amount)) public tokenBalance;
+    mapping(address => mapping(IERC20 => uint)) public tokenBalance;
     mapping(address => mapping(uint => TokenWithdraw)) public tokenWithdraws;
     mapping(address => uint) public withdrawNonce;
 
@@ -53,7 +53,7 @@ contract CollateralPool01 is Ownable, ReentrancyGuardTransient {
     }
 
     function startWithdraw(IERC20 token, uint amount) public nonReentrant() {
-        if(tokenBalance[msg.sender][token] > amount) {
+        if(tokenBalance[msg.sender][token] < amount) {
             revert InsufficientBalance(tokenBalance[msg.sender][token]);
         }
 
@@ -66,7 +66,10 @@ contract CollateralPool01 is Ownable, ReentrancyGuardTransient {
 
     function withdraw(uint nonce) public nonReentrant() {
         TokenWithdraw storage _tokenWithdraw = tokenWithdraws[msg.sender][nonce];
-        if (_tokenWithdraw.amount == 0) {
+        uint amount = _tokenWithdraw.amount;
+        IERC20 token = _tokenWithdraw.token;
+
+        if (amount == 0) {
             revert NothingToWithdraw();
         }
 
@@ -75,11 +78,10 @@ contract CollateralPool01 is Ownable, ReentrancyGuardTransient {
             revert WithdrawNotReady(withdrawReadyTime);
         }
 
-        _tokenWithdraw.token.safeTransfer(msg.sender, _tokenWithdraw.amount);
-        
-        emit WithdrawCompleted(nonce, msg.sender, _tokenWithdraw.token, _tokenWithdraw.amount);
+        delete tokenWithdraws[msg.sender][nonce];
+        token.safeTransfer(msg.sender, amount);
 
-        _tokenWithdraw.amount = 0;
+        emit WithdrawCompleted(nonce, msg.sender, token, amount);
     }
 
     function liquidateBalance(address depositor, IERC20 token, uint amount, address recipient) public onlyOwner() {
@@ -99,7 +101,11 @@ contract CollateralPool01 is Ownable, ReentrancyGuardTransient {
             revert InsufficientLiquidity(_tokenWithdraw.amount);
         }
 
-        _tokenWithdraw.amount -= amount;
+        if (_tokenWithdraw.amount == amount) {
+            delete tokenWithdraws[depositor][nonce];
+        } else {
+            _tokenWithdraw.amount -= amount;
+        }
         _tokenWithdraw.token.safeTransfer(recipient, amount);
 
         emit WithdrawLiquidated(nonce, depositor, _tokenWithdraw.token, amount, recipient);
