@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 
 import {ERC4626, IERC20, ERC20} from "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {IInventoryPool01} from "./interfaces/IInventoryPool01.sol";
 import {InventoryPoolParams01} from "./InventoryPoolParams01.sol";
@@ -27,8 +28,7 @@ struct BorrowerData {
  * @dev ...
  * ...
  */
- // TODO: need fallback guard!
-contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01 {
+contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardTransient {
     using Math for uint256;
 
     InventoryPoolParams01 public params;
@@ -69,7 +69,7 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01 {
         emit InventoryPoolParamsDeployed(paramsAddr_);
     }
 
-    function borrow(uint amount, address borrower, address recipient, uint expiryTime) public onlyOwner() {
+    function borrow(uint amount, address borrower, address recipient, uint expiryTime) public nonReentrant() onlyOwner() {
         if (expiryTime <= block.timestamp) {
             revert Expired();
         }
@@ -86,7 +86,7 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01 {
         IERC20(asset()).transfer(recipient, amount);
     }
 
-    function repay(uint amount, address borrower) public {
+    function repay(uint amount, address borrower) public nonReentrant() {
         if (amount == 0) {
           revert ZeroRepayment();
         }
