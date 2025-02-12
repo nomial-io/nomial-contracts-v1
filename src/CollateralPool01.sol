@@ -11,6 +11,7 @@ error InsufficientBalance(uint balance);
 error NothingToWithdraw();
 error WithdrawNotReady(uint withdrawReadyTime);
 error InsufficientLiquidity(uint amount);
+error NotSupported();
 
 event Deposited(address depositor, IERC20 token, uint amount);
 event WithdrawRequested(uint nonce, uint startTime, address depositor, IERC20 token, uint amount);
@@ -107,5 +108,9 @@ contract CollateralPool01 is Ownable, ReentrancyGuardTransient {
     function updateWithdrawPeriod(uint _withdrawPeriod) public onlyOwner() {
         withdrawPeriod = _withdrawPeriod;
         emit WithdrawPeriodUpdated(_withdrawPeriod);
+    }
+
+    receive() external payable {
+        revert NotSupported();
     }
 }
