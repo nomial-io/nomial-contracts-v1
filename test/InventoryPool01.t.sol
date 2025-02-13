@@ -52,6 +52,16 @@ contract InventoryPool01Test is Test, Helper {
         WETH_ERC20.approve(address(wethInventoryPool), MAX_UINT);
     }
 
+    function testInventoryPool01_borrow_expired() public {
+        vm.prank(WETH_WHALE);
+        wethInventoryPool.deposit(1_000 * 10**18, addr1);
+
+        vm.warp(TEST_TIMESTAMP);
+        vm.prank(poolOwner);
+        vm.expectRevert(Expired.selector);
+        wethInventoryPool.borrow(1*10**18, addr1, addr2, TEST_TIMESTAMP - 1);
+    }
+
     function testInventoryPool01_inflationAttack () public {
         vm.prank(WETH_WHALE);
         wethInventoryPool.deposit(1, addr1);

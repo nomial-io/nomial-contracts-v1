@@ -8,7 +8,9 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract Helper is Test {
 
-    uint256 public BLOCK_JAN_16_2024 = 21_638_600;
+    uint256 public BLOCK_JAN_16_2025 = 21_638_600;
+
+    uint public TEST_TIMESTAMP = 1739393780;
 
     address public WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
     address public USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
@@ -50,7 +52,7 @@ contract Helper is Test {
     uint public defaultPenaltyPeriod = 86400;
 
     function setupAll () public {
-        setupFork(BLOCK_JAN_16_2024);
+        setupFork(BLOCK_JAN_16_2025);
     }
     
     function setupFork (uint blockNumber) public {
