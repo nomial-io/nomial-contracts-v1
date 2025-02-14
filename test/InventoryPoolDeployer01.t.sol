@@ -18,18 +18,22 @@ contract InventoryPoolDeployer01Test is Test, Helper {
     }
 
     function testInventoryPoolDeployer01_poolAddress () public {
-        vm.prank(WETH_WHALE);
-        bytes memory paramsInitData = abi.encode(
-            defaultBaseFee,
-            defaultBaseRate,
-            defaultRate1,
-            defaultRate2,
-            defaultOptimalUtilizationRate,
-            defaultPenaltyRate,
-            defaultPenaltyPeriod
+        address paramsAddr = inventoryPoolDeployer01.inventoryPoolParamsAddress(
+            salt,
+            owner,
+            abi.encode(defaultBaseFee, defaultBaseRate, defaultRate1, defaultRate2, defaultOptimalUtilizationRate, defaultPenaltyRate, defaultPenaltyPeriod)
         );
-        address computedAddr = inventoryPoolDeployer01.poolAddress(salt, IERC20(WETH), "nomialWETH", "nmlWETH", 0, owner, paramsInitData);
-        address actualAddr = inventoryPoolDeployer01.deploy(salt, IERC20(WETH), "nomialWETH", "nmlWETH", 0, owner, paramsInitData);
+        address computedAddr = inventoryPoolDeployer01.poolAddress(salt, IERC20(WETH), "nomialWETH", "nmlWETH", 0, owner, paramsAddr);
+
+        vm.prank(WETH_WHALE);
+        (address actualAddr,) = inventoryPoolDeployer01.deploy(
+            salt,
+            IERC20(WETH), "nomialWETH", "nmlWETH",
+            0,
+            owner,
+            abi.encode(defaultBaseFee, defaultBaseRate, defaultRate1, defaultRate2, defaultOptimalUtilizationRate, defaultPenaltyRate, defaultPenaltyPeriod)
+        );
+
         assertEq(computedAddr, actualAddr);
     }
 }

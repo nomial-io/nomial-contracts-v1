@@ -7,11 +7,8 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {IInventoryPool01} from "./interfaces/IInventoryPool01.sol";
-import {InventoryPoolParams01} from "./InventoryPoolParams01.sol";
+import {IInventoryPoolParams01} from "./interfaces/IInventoryPoolParams01.sol";
 
-event InventoryPoolParamsDeployed(address inventoryPoolParams);
-
-error FailedToDeployInventoryPoolParams();
 error NotSupported();
 error Expired();
 error NoDebt();
@@ -31,7 +28,7 @@ struct BorrowerData {
 contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardTransient {
     using Math for uint256;
 
-    InventoryPoolParams01 public params;
+    IInventoryPoolParams01 public params;
     uint public storedAccInterestFactor;
     uint public lastAccumulatedInterestUpdate;
     uint public scaledReceivables;
@@ -44,7 +41,7 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
         string memory symbol,
         uint initAmount,
         address owner,
-        bytes memory paramsInitData
+        address params_
     ) ERC4626(IERC20(asset_)) ERC20(name, symbol) Ownable(owner) {
         /**
          * deployer is responsible for burning a small deposit to mitigate inflation attack.
@@ -53,20 +50,7 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
          */
         deposit(initAmount, 0x000000000000000000000000000000000000dEaD);
 
-        bytes memory bytecode = type(InventoryPoolParams01).creationCode;
-        bytecode = abi.encodePacked(bytecode, abi.encode(owner, address(this), paramsInitData));
-        address paramsAddr_;
-        assembly {
-            paramsAddr_ := create2(0, add(bytecode, 0x20), mload(bytecode), 0)
-        }
-
-        if (paramsAddr_ == address(0)) {
-            revert FailedToDeployInventoryPoolParams();
-        }
-
-        params = InventoryPoolParams01(paramsAddr_);
-
-        emit InventoryPoolParamsDeployed(paramsAddr_);
+        params = IInventoryPoolParams01(params_);
     }
 
     function borrow(uint amount, address borrower, address recipient, uint expiryTime) public nonReentrant() onlyOwner() {
@@ -134,7 +118,7 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
     }
 
     function upgrageParamsContract (address params_) public onlyOwner() {
-        params = InventoryPoolParams01(params_);
+        params = IInventoryPoolParams01(params_);
     }
 
     function totalAssets() public view override(ERC4626, IInventoryPool01) returns (uint) {
@@ -142,7 +126,7 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
     }
 
     function totalReceivables() public view returns (uint) {
-        return scaledReceivables.mulDiv(accumulatedInterestFactor(), 1e27);
+        return _totalReceivables(accumulatedInterestFactor());
     }
 
     function utilizationRate() public view returns (uint) {
@@ -178,7 +162,10 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
             return 1e27;
         } else {
             // newFactor = oldFactor * (1 + ratePerSecond * secondsSinceLastUpdate)
-            return storedAccInterestFactor.mulDiv(1e27 + params.interestRate() * (block.timestamp - lastAccumulatedInterestUpdate), 1e27);
+            return storedAccInterestFactor.mulDiv(
+                1e27 + params.interestRate(_utilizationRate(storedAccInterestFactor)) * (block.timestamp - lastAccumulatedInterestUpdate),
+                1e27
+            );
         }
     }
 
@@ -198,6 +185,16 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
     function _updateAccumulatedInterestFactor () internal {
         storedAccInterestFactor = accumulatedInterestFactor();
         lastAccumulatedInterestUpdate = block.timestamp;
+    }
+
+    function _utilizationRate(uint accInterestFactor) internal view returns (uint) {
+        uint totalReceivables_ = _totalReceivables(accInterestFactor);
+        uint totalAssets_ = totalReceivables_ + IERC20(asset()).balanceOf(address(this));
+        return totalReceivables_.mulDiv(1e27, totalAssets_);
+    }
+
+    function _totalReceivables(uint accInterestFactor) internal view returns (uint) {
+        return scaledReceivables.mulDiv(accInterestFactor, 1e27);
     }
 
     function _baseDebt(address borrower, uint accInterestFactor) internal view returns (uint) {
