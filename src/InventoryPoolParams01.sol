@@ -48,9 +48,9 @@ contract InventoryPoolParams01 is Ownable, IInventoryPoolParams01 {
     /* Rate for interest on borrows. Rate is per-second expressed in 1e27. Based on Aave v3 formula for utilization-based variable interest rate */
     function interestRate(uint utilizationRate_) external view returns (uint interestRate_){
         if (utilizationRate_ <= _optimalUtilizationRate) {
-            interestRate_ = _baseRate + utilizationRate_.mulDiv(1e27, _optimalUtilizationRate) * _rate1;
+            interestRate_ = _baseRate + _rate1.mulDiv(utilizationRate_, _optimalUtilizationRate);
         } else {
-            interestRate_ = _baseRate + _rate1 + (utilizationRate_ - _optimalUtilizationRate).mulDiv(1e27, (1e27 - _optimalUtilizationRate)) * _rate2;
+            interestRate_ = _baseRate + _rate1 + _rate2.mulDiv((utilizationRate_ - _optimalUtilizationRate), (1e27 - _optimalUtilizationRate));
         }
     }
 

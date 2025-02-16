@@ -65,55 +65,51 @@ contract InventoryPool01Test is Test, Helper {
         wethInventoryPool.borrow(1*10**18, addr1, addr2, TEST_TIMESTAMP - 1);
     }
 
-    function testInventoryPool01_borrow_updatesScaledValues() public {
-        // Setup initial liquidity
+    function testInventoryPool01_borrow_initialState() public {
         vm.prank(WETH_WHALE);
         wethInventoryPool.deposit(1_000 * 10**18, addr1);
 
-        // Perform borrow
         uint borrowAmount = 1 * 10**18;
         vm.warp(TEST_TIMESTAMP);
+        
+        uint baseFee = wethInventoryPool.params().baseFee();
         
         vm.startPrank(poolOwner);
         wethInventoryPool.borrow(borrowAmount, addr1, addr2, TEST_TIMESTAMP + 1 days);
         vm.stopPrank();
 
-        // // log scaledReceivables
-        // console.log("scaledReceivables: ");
-        // console.logUint(wethInventoryPool.scaledReceivables());
+        uint baseDebt = wethInventoryPool.baseDebt(addr1);
+        uint expectedDebt = borrowAmount + (borrowAmount * baseFee) / 1e27;
+        assertEq(baseDebt, expectedDebt, "Base debt should equal borrow amount plus base fee");
 
-        // log accumulatedInterestFactor
-        console.log("accumulatedInterestFactor: ");
-        console.logUint(wethInventoryPool.accumulatedInterestFactor());
+        uint penaltyTime = wethInventoryPool.penaltyTime(addr1);
+        uint penaltyDebt = wethInventoryPool.penaltyDebt(addr1);
+        assertEq(penaltyTime, 0, "Penalty time should be 0");
+        assertEq(penaltyDebt, 0, "Penalty debt should be 0");
+    }
 
-        // // log totalReceivables
-        // console.log("totalReceivables: ");
-        // console.logUint(wethInventoryPool.totalReceivables());
+    function testInventoryPool01_borrow_accumulatedInterest() public {
+        vm.prank(WETH_WHALE);
+        wethInventoryPool.deposit(1_000 * 10**18, addr1);
 
-        // // log utilizationRate
-        // console.log("utilizationRate: ");
-        // console.logUint(wethInventoryPool.utilizationRate());  
+        uint borrowAmount = 100 * 10**18;
+        vm.warp(TEST_TIMESTAMP);
+        
+        uint baseFee = wethInventoryPool.params().baseFee();
+        
+        vm.startPrank(poolOwner);
+        wethInventoryPool.borrow(borrowAmount, addr1, addr2, TEST_TIMESTAMP + 1 days);
+        vm.stopPrank();
 
-        // // log the params.interestRate() value
-        // console.log("interestRate: ");
-        // console.logUint(wethInventoryPool.params().interestRate());
-
-        // uint storedAccInterestFactor = wethInventoryPool.storedAccInterestFactor();
-        // console.log("storedAccInterestFactor: ");
-        // console.logUint(storedAccInterestFactor);
-
-        // // Verify baseDebt equals borrow amount
-        // uint baseDebt = wethInventoryPool.baseDebt(addr1);
-        // console.log("Base debt:", baseDebt);
-        // assertEq(baseDebt, borrowAmount, "Base debt should equal borrow amount");
-
-        // // Verify penalty values are 0
-        // uint penaltyTime = wethInventoryPool.penaltyTime(addr1);
-        // uint penaltyDebt = wethInventoryPool.penaltyDebt(addr1);
-        // console.log("Penalty time:", penaltyTime);
-        // console.log("Penalty debt:", penaltyDebt);
-        // assertEq(penaltyTime, 0, "Penalty time should be 0");
-        // assertEq(penaltyDebt, 0, "Penalty debt should be 0");
+        uint initialBaseDebt = wethInventoryPool.baseDebt(addr1);
+        uint utilizationRate = wethInventoryPool.utilizationRate();
+        uint interestRate = wethInventoryPool.params().interestRate(utilizationRate);
+        
+        vm.warp(TEST_TIMESTAMP + 1 hours);
+        
+        uint newBaseDebt = wethInventoryPool.baseDebt(addr1);
+        uint expectedDebt = initialBaseDebt + (initialBaseDebt * interestRate * 1 hours) / 1e27;
+        assertEq(newBaseDebt, expectedDebt, "Base debt should reflect 1 hour of interest");
     }
 
     function testInventoryPool01_inflationAttack () public {

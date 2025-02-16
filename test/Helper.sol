@@ -32,20 +32,20 @@ contract Helper is Test {
     // 0% base rate
     uint public defaultBaseRate = 0;
 
-    // 11.5% annual rate1 (per-second)
-    // 115 * 1e24 / (60 * 60 * 24 * 365)
-    uint public defaultRate1 = 3646626078132927500;
+    // 10% annual rate1 (per-second)
+    // 10n * 10n**25n / (60n * 60n * 24n * 365n)
+    uint public defaultRate1 = 3170979198376458650;
 
-    // 46.5% annual rate2 (per-second)
-    // 465 * 1e24 / (60 * 60 * 24 * 365)
-    uint public defaultRate2 = 14745053272450533000;
+    // 100% annual rate2 (per-second)
+    // 100n * 10n**25n / (60n * 60n * 24n * 365n)
+    uint public defaultRate2 = 31709791983764586504;
 
-    // 92% optimal utilization rate
-    // 92 * 1e25
-    uint public defaultOptimalUtilizationRate = 920000000000000000000000000;
+    // 80% optimal utilization rate
+    // 80n * 10n**25n
+    uint public defaultOptimalUtilizationRate = 800000000000000000000000000;
 
     // 500% annual penalty rate, per second
-    // 500 * 1e25 / (60 * 60 * 24 * 365)
+    // 500n * 10n**25n / (60n * 60n * 24n * 365n)
     uint public defaultPenaltyRate = 158548959918822932521;
 
     // 24 hour penalty period, in seconds
