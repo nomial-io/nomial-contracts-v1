@@ -14,6 +14,7 @@ error Expired();
 error NoDebt();
 error ZeroRepayment();
 error InsufficientLiquidity();
+error WrongChainId();
 
 struct BorrowerData {
     uint scaledDebt;
@@ -53,10 +54,9 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
         params = IInventoryPoolParams01(params_);
     }
 
-    function borrow(uint amount, address borrower, address recipient, uint expiryTime) public nonReentrant() onlyOwner() {
-        if (expiryTime <= block.timestamp) {
-            revert Expired();
-        }
+    function borrow(uint amount, address borrower, address recipient, uint expiry, uint chainId) external onlyOwner {
+        if (block.timestamp > expiry) revert Expired();
+        if (block.chainid != chainId) revert WrongChainId();
 
         _updateAccumulatedInterestFactor();
 

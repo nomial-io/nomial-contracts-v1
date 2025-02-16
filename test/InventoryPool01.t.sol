@@ -55,6 +55,16 @@ contract InventoryPool01Test is Test, Helper {
         WETH_ERC20.approve(address(wethInventoryPool), MAX_UINT);
     }
 
+    function testInventoryPool01_borrow_wrongChainId() public {
+        vm.prank(WETH_WHALE);
+        wethInventoryPool.deposit(1_000 * 10**18, addr1);
+
+        vm.warp(TEST_TIMESTAMP);
+        vm.prank(poolOwner);
+        vm.expectRevert(WrongChainId.selector);
+        wethInventoryPool.borrow(1*10**18, addr1, addr2, TEST_TIMESTAMP + 1 days, block.chainid + 1);
+    }
+
     function testInventoryPool01_borrow_expired() public {
         vm.prank(WETH_WHALE);
         wethInventoryPool.deposit(1_000 * 10**18, addr1);
@@ -62,7 +72,7 @@ contract InventoryPool01Test is Test, Helper {
         vm.warp(TEST_TIMESTAMP);
         vm.prank(poolOwner);
         vm.expectRevert(Expired.selector);
-        wethInventoryPool.borrow(1*10**18, addr1, addr2, TEST_TIMESTAMP - 1);
+        wethInventoryPool.borrow(1*10**18, addr1, addr2, TEST_TIMESTAMP - 1, block.chainid);
     }
 
     function testInventoryPool01_borrow_initialState() public {
@@ -75,7 +85,7 @@ contract InventoryPool01Test is Test, Helper {
         uint baseFee = wethInventoryPool.params().baseFee();
         
         vm.startPrank(poolOwner);
-        wethInventoryPool.borrow(borrowAmount, addr1, addr2, TEST_TIMESTAMP + 1 days);
+        wethInventoryPool.borrow(borrowAmount, addr1, addr2, TEST_TIMESTAMP + 1 days, block.chainid);
         vm.stopPrank();
 
         uint baseDebt = wethInventoryPool.baseDebt(addr1);
@@ -96,7 +106,7 @@ contract InventoryPool01Test is Test, Helper {
         vm.warp(TEST_TIMESTAMP);
         
         vm.startPrank(poolOwner);
-        wethInventoryPool.borrow(borrowAmount, addr1, addr2, TEST_TIMESTAMP + 1 days);
+        wethInventoryPool.borrow(borrowAmount, addr1, addr2, TEST_TIMESTAMP + 1 days, block.chainid);
         vm.stopPrank();
 
         uint initialBaseDebt = wethInventoryPool.baseDebt(addr1);
@@ -118,7 +128,7 @@ contract InventoryPool01Test is Test, Helper {
         vm.warp(TEST_TIMESTAMP);
         
         vm.startPrank(poolOwner);
-        wethInventoryPool.borrow(borrowAmount, addr1, addr2, TEST_TIMESTAMP + 1 days);
+        wethInventoryPool.borrow(borrowAmount, addr1, addr2, TEST_TIMESTAMP + 1 days, block.chainid);
         vm.stopPrank();
 
         uint penaltyPeriod = wethInventoryPool.params().penaltyPeriod();
