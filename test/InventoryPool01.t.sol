@@ -95,8 +95,6 @@ contract InventoryPool01Test is Test, Helper {
         uint borrowAmount = 100 * 10**18;
         vm.warp(TEST_TIMESTAMP);
         
-        uint baseFee = wethInventoryPool.params().baseFee();
-        
         vm.startPrank(poolOwner);
         wethInventoryPool.borrow(borrowAmount, addr1, addr2, TEST_TIMESTAMP + 1 days);
         vm.stopPrank();
@@ -112,45 +110,56 @@ contract InventoryPool01Test is Test, Helper {
         assertEq(newBaseDebt, expectedDebt, "Base debt should reflect 1 hour of interest");
     }
 
+    function testInventoryPool01_borrow_penaltyAfterPeriod() public {
+        vm.prank(WETH_WHALE);
+        wethInventoryPool.deposit(1_000 * 10**18, addr1);
+
+        uint borrowAmount = 100 * 10**18;
+        vm.warp(TEST_TIMESTAMP);
+        
+        vm.startPrank(poolOwner);
+        wethInventoryPool.borrow(borrowAmount, addr1, addr2, TEST_TIMESTAMP + 1 days);
+        vm.stopPrank();
+
+        uint penaltyPeriod = wethInventoryPool.params().penaltyPeriod();
+        uint penaltyRate = wethInventoryPool.params().penaltyRate();
+
+        vm.warp(TEST_TIMESTAMP + penaltyPeriod + 12 hours);
+        
+        uint penaltyTime = wethInventoryPool.penaltyTime(addr1);
+        assertEq(penaltyTime, 12 hours, "Penalty time should be time elapsed after penalty period");
+
+        uint penaltyDebt = wethInventoryPool.penaltyDebt(addr1);
+        uint expectedPenaltyDebt = (12 hours * penaltyRate) / 1e27;
+        assertEq(penaltyDebt, expectedPenaltyDebt, "Penalty debt should accumulate at penalty rate");
+    }
+
     function testInventoryPool01_inflationAttack () public {
+        // Attacker deposits minimal amount
         vm.prank(WETH_WHALE);
         wethInventoryPool.deposit(1, addr1);
         uint numShares1 = wethInventoryPool.balanceOf(addr1);
-        console.log("LP1 shares: ");
-        console.logUint(numShares1);
-        console.log("pool balance: ");
-        console.logUint(IERC20(WETH).balanceOf(address(wethInventoryPool)));
-        console.log();
-
+        
+        // Attacker transfers tokens to pool directly
         vm.prank(WETH_WHALE);
         IERC20(WETH).transfer(address(wethInventoryPool), 1 * 10**18);
-        console.log("pool balance: ");
-        console.logUint(IERC20(WETH).balanceOf(address(wethInventoryPool)));
-        console.log();
-
+        
+        // LP deposits large amount
         vm.prank(WETH_WHALE);
         wethInventoryPool.deposit(1 * 10**18, addr2);
         uint numShares2 = wethInventoryPool.balanceOf(addr2);
-        console.log("LP2 shares: ");
-        console.logUint(numShares2);
-        console.log("pool balance: ");
-        console.logUint(IERC20(WETH).balanceOf(address(wethInventoryPool)));
-        console.log();
 
+        // Both LPs withdraw
         vm.prank(addr1);
         wethInventoryPool.redeem(numShares1, addr1, addr1);
-        uint maxWithdraw = wethInventoryPool.maxWithdraw(addr2);
-        vm.prank(addr2);
-        wethInventoryPool.withdraw(maxWithdraw, addr2, addr2);
-        console.log("LP1 bal: ");
-        console.logUint(IERC20(WETH).balanceOf(addr1));
-        console.log("LP2 bal: ");
-        console.logUint(IERC20(WETH).balanceOf(addr2));
-        console.log("pool balance: ");
-        console.logUint(IERC20(WETH).balanceOf(address(wethInventoryPool)));
-        console.log();
-        
 
-        vm.stopPrank();
+        vm.prank(addr2);
+        wethInventoryPool.redeem(numShares2, addr2, addr2);
+        
+        uint addr1Balance = IERC20(WETH).balanceOf(addr1);
+        uint addr2Balance = IERC20(WETH).balanceOf(addr2);
+
+        assertEq(addr1Balance, 10000, "Attacker should get a dust amount of WETH");
+        assertEq(addr2Balance, 1 * 10**18 - 48, "Second LP should get their deposit minus some dust");
     }
 }
