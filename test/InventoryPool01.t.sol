@@ -247,4 +247,15 @@ contract InventoryPool01Test is Test, Helper {
         uint addr2ExpectedDebt = addr2InitialDebt + (addr2InitialDebt * interestRate2 * 1 hours) / 1e27;
         assertEq(addr2Debt, addr2ExpectedDebt, "Second borrower should reflect only the higher interest rate period");
     }
+
+    function testInventoryPool01_repay_zeroRepayment() public {
+        vm.prank(WETH_WHALE);
+        wethInventoryPool.deposit(1_000 * 10**18, poolOwner);
+
+        vm.prank(poolOwner);
+        wethInventoryPool.borrow(1 * 10**18, addr1, addr1, TEST_TIMESTAMP + 1 days, block.chainid);
+
+        vm.expectRevert(ZeroRepayment.selector);
+        wethInventoryPool.repay(0, addr1);
+    }
 }
