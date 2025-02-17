@@ -5,9 +5,9 @@ pragma solidity ^0.8.20;
 import "forge-std/Test.sol";
 import "forge-std/Vm.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 contract Helper is Test {
-
     uint256 public BLOCK_JAN_16_2025 = 21_638_600;
 
     uint public TEST_TIMESTAMP = 1739393780;

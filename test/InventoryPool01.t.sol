@@ -9,6 +9,7 @@ import "../src/InventoryPoolDeployer01.sol";
 import "./Helper.sol";
 
 contract InventoryPool01Test is Test, Helper {
+    using Math for uint256;
 
     InventoryPoolDeployer01 public inventoryPoolDeployer01;
     InventoryPool01 public usdcInventoryPool;
@@ -171,5 +172,51 @@ contract InventoryPool01Test is Test, Helper {
 
         assertEq(addr1Balance, 10000, "Attacker should get a dust amount of WETH");
         assertEq(addr2Balance, 1 * 10**18 - 48, "Second LP should get their deposit minus some dust");
+    }
+
+    function testInventoryPool01_borrow_variableInterestRate() public {
+        vm.prank(WETH_WHALE);
+        wethInventoryPool.deposit(1_000 * 10**18, poolOwner);
+
+        vm.warp(TEST_TIMESTAMP);
+
+        // borrow at very low utilization and interestRate
+        vm.prank(poolOwner);
+        wethInventoryPool.borrow(1 * 10**18, addr1, addr1, TEST_TIMESTAMP + 1 days, block.chainid);
+
+        uint interestRate1 = wethInventoryPool.params().interestRate(wethInventoryPool.utilizationRate());
+        uint addr1InitialDebt = wethInventoryPool.baseDebt(addr1);
+
+        // Move forward 1 hour to accumulate some interest at interestRate1
+        vm.warp(TEST_TIMESTAMP + 1 hours);
+        
+        uint addr1Debt = wethInventoryPool.baseDebt(addr1);
+        uint addr1ExpectedDebt = addr1InitialDebt + (addr1InitialDebt * interestRate1 * 1 hours) / 1e27;
+        assertEq(addr1Debt, addr1ExpectedDebt, "Expected debt after 1 hour at interestRate1 should match");
+
+        // Large borrow to increase utilization and interestRate
+        vm.startPrank(poolOwner);
+        wethInventoryPool.borrow(250 * 10**18, poolOwner, poolOwner, TEST_TIMESTAMP + 1 days, block.chainid);
+        wethInventoryPool.borrow(3 * 10**18, addr2, addr2, TEST_TIMESTAMP + 1 days, block.chainid);
+        vm.stopPrank();
+
+        uint addr2InitialDebt = wethInventoryPool.baseDebt(addr2);
+
+        uint interestRate2 = wethInventoryPool.params().interestRate(wethInventoryPool.utilizationRate());
+        uint expectedRate2 = defaultRate1.mulDiv(wethInventoryPool.utilizationRate(), defaultOptimalUtilizationRate);
+        assertEq(interestRate2, expectedRate2, "Interest rate should rate1 * utilizationRate / optimalUtilizationRate");
+
+        // Move forward another hour to accumulate interest at the higher rate
+        vm.warp(TEST_TIMESTAMP + 2 hours);
+
+        // Check borrower 1 debt reflects both interest rate periods
+        addr1Debt = wethInventoryPool.baseDebt(addr1);
+        addr1ExpectedDebt = addr1ExpectedDebt + (addr1ExpectedDebt * interestRate2 * 1 hours) / 1e27;
+        assertEq(addr1Debt, addr1ExpectedDebt, "First borrower should reflect both interest rate periods");
+
+        // Check borrower 2 debt reflects only the higher rate
+        uint addr2Debt = wethInventoryPool.baseDebt(addr2);
+        uint addr2ExpectedDebt = addr2InitialDebt + (addr2InitialDebt * interestRate2 * 1 hours) / 1e27;
+        assertEq(addr2Debt, addr2ExpectedDebt, "Second borrower should reflect only the higher interest rate period");
     }
 }
