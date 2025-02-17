@@ -174,6 +174,20 @@ contract InventoryPool01Test is Test, Helper {
         assertEq(addr2Balance, 1 * 10**18 - 48, "Second LP should get their deposit minus some dust");
     }
 
+    function testInventoryPool01_borrow_transferToRecipient() public {
+        vm.prank(WETH_WHALE);
+        wethInventoryPool.deposit(1_000 * 10**18, poolOwner);
+
+        uint borrowAmount = 1 * 10**18;
+        uint recipientInitialBalance = IERC20(WETH).balanceOf(addr2);
+
+        vm.prank(poolOwner);
+        wethInventoryPool.borrow(borrowAmount, addr1, addr2, TEST_TIMESTAMP + 1 days, block.chainid);
+
+        uint recipientFinalBalance = IERC20(WETH).balanceOf(addr2);
+        assertEq(recipientFinalBalance - recipientInitialBalance, borrowAmount, "Recipient should receive the borrowed ERC20 amount");
+    }
+
     function testInventoryPool01_borrow_variableInterestRate() public {
         vm.prank(WETH_WHALE);
         wethInventoryPool.deposit(1_000 * 10**18, poolOwner);
