@@ -258,4 +258,12 @@ contract InventoryPool01Test is Test, Helper {
         vm.expectRevert(ZeroRepayment.selector);
         wethInventoryPool.repay(0, addr1);
     }
+
+    function testInventoryPool01_repay_noDebt() public {
+        vm.prank(WETH_WHALE);
+        wethInventoryPool.deposit(1_000 * 10**18, poolOwner);
+
+        vm.expectRevert(NoDebt.selector);
+        wethInventoryPool.repay(1 * 10**18, addr1);
+    }
 }
