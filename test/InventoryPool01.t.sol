@@ -331,14 +331,14 @@ contract InventoryPool01Test is Test, Helper {
         // Approve WETH for repayment
         vm.startPrank(addr1);
         WETH_ERC20.approve(address(wethInventoryPool), totalPayment);
-        
-        // Expect base debt repayment event
-        vm.expectEmit(true, false, false, true, address(wethInventoryPool));
-        emit IInventoryPool01.BaseDebtRepayment(addr1, baseDebt, baseDebt / 2);
 
         // Expect penalty repayment event
         vm.expectEmit(true, false, false, true, address(wethInventoryPool));
         emit IInventoryPool01.PenaltyRepayment(addr1, penaltyDebt, penaltyDebt);
+        
+        // Expect base debt repayment event
+        vm.expectEmit(true, false, false, true, address(wethInventoryPool));
+        emit IInventoryPool01.BaseDebtRepayment(addr1, baseDebt, baseDebt / 2);
         
         wethInventoryPool.repay(totalPayment, addr1);
         vm.stopPrank();

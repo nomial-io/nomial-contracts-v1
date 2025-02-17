@@ -98,6 +98,7 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
                 penaltyPayment_ = amount;
                 baseDebtPayment_ = 0;
             }
+            emit PenaltyRepayment(borrower, penaltyDebt_, penaltyPayment_);
         }
         
         if (baseDebtPayment_ > 0) {
@@ -115,10 +116,6 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
             scaledReceivables -= scaledDebt_;
 
             emit BaseDebtRepayment(borrower, baseDebt_, baseDebtPayment_);
-        }
-
-        if (penaltyPayment_ > 0) {
-            emit PenaltyRepayment(borrower, penaltyDebt_, penaltyPayment_);
         }
 
         IERC20(asset()).transferFrom(msg.sender, address(this), baseDebtPayment_ + penaltyPayment_);
