@@ -7,6 +7,7 @@ import {IInventoryPoolParams01} from "./IInventoryPoolParams01.sol";
 interface IInventoryPool01 {
     event Borrowed(address indexed borrower, address indexed recipient, uint amount);
     event PenaltyRepayment(address indexed borrower, uint penaltyDebt, uint penaltyPaymentAmount);
+    event BaseDebtRepayment(address indexed borrower, uint baseDebt, uint baseDebtPaymentAmount);
 
     function borrow(uint amount, address borrower, address recipient, uint expiry, uint chainId) external;
     function repay(uint amount, address borrower) external;
