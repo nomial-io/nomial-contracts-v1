@@ -86,31 +86,40 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
 
         uint baseDebtPayment_ = amount;
 
-        uint penaltyDebt_ = penaltyDebt(borrower);
+        uint penaltyDebt_ = _penaltyDebt(borrower, storedAccInterestFactor);
+        uint penaltyPayment_ = 0;
         if (penaltyDebt_ > 0) {
             if (baseDebtPayment_ > penaltyDebt_) {
                 baseDebtPayment_ -= penaltyDebt_;
+                penaltyPayment_ = penaltyDebt_;
                 borrowers[borrower].penaltyDebtPaid = 0;
             } else {
                 borrowers[borrower].penaltyDebtPaid += amount;
-                return;
+                penaltyPayment_ = amount;
+                baseDebtPayment_ = 0;
             }
         }
         
-        if (baseDebtPayment_ >= baseDebt_) {
-            borrowers[borrower].penaltyCounterStart = 0;
-            baseDebtPayment_ = baseDebt_;
-        } else {
-            uint period_ = params.penaltyPeriod();
-            uint paymentRatio_ = baseDebtPayment_.mulDiv(1e27, baseDebt_);
-            borrowers[borrower].penaltyCounterStart = block.timestamp - period_ + paymentRatio_.mulDiv(period_, 1e27);
+        if (baseDebtPayment_ > 0) {
+            if (baseDebtPayment_ >= baseDebt_) {
+                borrowers[borrower].penaltyCounterStart = 0;
+                baseDebtPayment_ = baseDebt_;
+            } else {
+                uint period_ = params.penaltyPeriod();
+                uint paymentRatio_ = baseDebtPayment_.mulDiv(1e27, baseDebt_);
+                borrowers[borrower].penaltyCounterStart = block.timestamp - period_ + paymentRatio_.mulDiv(period_, 1e27);
+            }
+
+            uint scaledDebt_ = baseDebtPayment_.mulDiv(1e27, storedAccInterestFactor);
+            borrowers[borrower].scaledDebt -= scaledDebt_;
+            scaledReceivables -= scaledDebt_;
         }
 
-        uint scaledDebt_ = baseDebtPayment_.mulDiv(1e27, storedAccInterestFactor);
-        borrowers[borrower].scaledDebt -= scaledDebt_;
-        scaledReceivables -= scaledDebt_;
+        if (penaltyPayment_ > 0) {
+            emit PenaltyRepayment(borrower, penaltyDebt_, penaltyPayment_);
+        }
 
-        IERC20(asset()).transferFrom(msg.sender, address(this), baseDebtPayment_);
+        IERC20(asset()).transferFrom(msg.sender, address(this), baseDebtPayment_ + penaltyPayment_);
     }
 
     function absolvePenalty (address borrower) public onlyOwner() {
@@ -142,10 +151,7 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
     }
 
     function penaltyDebt(address borrower) public view returns (uint) {
-        uint penaltyTime_ = penaltyTime(borrower);
-        if (penaltyTime_ == 0) return 0;
-
-        return penaltyTime_.mulDiv(params.penaltyRate(), 1e27) - borrowers[borrower].penaltyDebtPaid;
+        return _penaltyDebt(borrower, accumulatedInterestFactor());
     }
 
     function penaltyTime(address borrower) public view returns (uint) {
@@ -201,6 +207,13 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
 
     function _baseDebt(address borrower, uint accInterestFactor) internal view returns (uint) {
         return borrowers[borrower].scaledDebt.mulDiv(accInterestFactor, 1e27);
+    }
+
+    function _penaltyDebt(address borrower, uint accInterestFactor) internal view returns (uint) {
+        uint penaltyTime_ = penaltyTime(borrower);
+        if (penaltyTime_ == 0) return 0;
+
+        return (_baseDebt(borrower, accInterestFactor) * penaltyTime_).mulDiv(params.penaltyRate(), 1e27) - borrowers[borrower].penaltyDebtPaid;
     }
 
     receive() external payable {

@@ -141,7 +141,8 @@ contract InventoryPool01Test is Test, Helper {
         assertEq(penaltyTime, 12 hours, "Penalty time should be time elapsed after penalty period");
 
         uint penaltyDebt = wethInventoryPool.penaltyDebt(addr1);
-        uint expectedPenaltyDebt = (12 hours * penaltyRate) / 1e27;
+        uint baseDebt = wethInventoryPool.baseDebt(addr1);
+        uint expectedPenaltyDebt = (baseDebt * penaltyRate * 12 hours) / 1e27;
         assertEq(penaltyDebt, expectedPenaltyDebt, "Penalty debt should accumulate at penalty rate");
     }
 
@@ -265,5 +266,103 @@ contract InventoryPool01Test is Test, Helper {
 
         vm.expectRevert(NoDebt.selector);
         wethInventoryPool.repay(1 * 10**18, addr1);
+    }
+
+    function testInventoryPool01_repay_penaltyDebtPartial() public {
+        vm.prank(WETH_WHALE);
+        wethInventoryPool.deposit(1_000 * 10**18, poolOwner);
+
+        vm.warp(TEST_TIMESTAMP);
+        
+        vm.startPrank(poolOwner);
+        wethInventoryPool.borrow(100 * 10**18, addr1, addr1, TEST_TIMESTAMP + 1 days, block.chainid);
+        vm.stopPrank();
+
+        // Move past penalty period and accrue some penalty debt
+        uint penaltyPeriod = wethInventoryPool.params().penaltyPeriod();
+        vm.warp(TEST_TIMESTAMP + penaltyPeriod + 12 hours);
+        
+        uint penaltyDebt = wethInventoryPool.penaltyDebt(addr1);
+        uint partialRepayment = penaltyDebt / 2;  // Repay half of penalty debt
+
+        // Get initial pool balance
+        uint poolInitialBalance = IERC20(WETH).balanceOf(address(wethInventoryPool));
+
+        // Approve WETH for repayment
+        vm.startPrank(addr1);
+        WETH_ERC20.approve(address(wethInventoryPool), partialRepayment);
+
+        // Expect penalty repayment event
+        vm.expectEmit(true, false, false, true, address(wethInventoryPool));
+        emit IInventoryPool01.PenaltyRepayment(addr1, penaltyDebt, partialRepayment);
+        
+        wethInventoryPool.repay(partialRepayment, addr1);
+        vm.stopPrank();
+
+        // Verify remaining penalty debt
+        assertEq(wethInventoryPool.penaltyDebt(addr1), penaltyDebt - partialRepayment, "Remaining penalty debt should be half");
+
+        // Verify ERC20 transfer to pool
+        uint poolFinalBalance = IERC20(WETH).balanceOf(address(wethInventoryPool));
+        assertEq(poolFinalBalance - poolInitialBalance, partialRepayment, "Pool should receive the penalty payment amount");
+    }
+
+    function testInventoryPool01_repay_penaltyAndBaseDebt() public {
+        vm.prank(WETH_WHALE);
+        wethInventoryPool.deposit(1_000 * 10**18, poolOwner);
+
+        vm.warp(TEST_TIMESTAMP);
+        
+        vm.startPrank(poolOwner);
+        wethInventoryPool.borrow(100 * 10**18, addr1, addr1, TEST_TIMESTAMP + 1 days, block.chainid);
+        vm.stopPrank();
+
+        // Move past penalty period and accrue some penalty debt
+        uint penaltyPeriod = wethInventoryPool.params().penaltyPeriod();
+        vm.warp(TEST_TIMESTAMP + penaltyPeriod + 12 hours);
+        
+        uint penaltyDebt = wethInventoryPool.penaltyDebt(addr1);
+        uint baseDebt = wethInventoryPool.baseDebt(addr1);
+        uint totalPayment = penaltyDebt + (baseDebt / 2);  // Pay all penalty debt plus half of base debt
+
+        // Get initial balances
+        uint poolInitialBalance = IERC20(WETH).balanceOf(address(wethInventoryPool));
+
+        // Approve WETH for repayment
+        vm.startPrank(addr1);
+        WETH_ERC20.approve(address(wethInventoryPool), totalPayment);
+
+        // Expect penalty repayment event
+        vm.expectEmit(true, false, false, true, address(wethInventoryPool));
+        emit IInventoryPool01.PenaltyRepayment(addr1, penaltyDebt, penaltyDebt);
+        
+        wethInventoryPool.repay(totalPayment, addr1);
+        vm.stopPrank();
+
+        // Verify penalty debt is cleared
+        assertEq(wethInventoryPool.penaltyDebt(addr1), 0, "No penalty debt should remain");
+
+        // Verify time since penaltyCounterStart is half of penalty period
+        (,uint penaltyCounterStart,) = wethInventoryPool.borrowers(addr1);
+        uint timeSincePenaltyStart = block.timestamp - penaltyCounterStart;
+        assertApproxEqAbs(
+            timeSincePenaltyStart,
+            penaltyPeriod / 2,
+            1,
+            "Time since penaltyCounterStart should be half of penalty period"
+        );
+
+        // Verify base debt is partially paid
+        uint expectedRemainingDebt = baseDebt / 2;
+        assertApproxEqAbs(
+            wethInventoryPool.baseDebt(addr1),
+            expectedRemainingDebt,
+            1,
+            "Half of base debt should remain"
+        );
+
+        // Verify ERC20 transfer to pool
+        uint poolFinalBalance = IERC20(WETH).balanceOf(address(wethInventoryPool));
+        assertEq(poolFinalBalance - poolInitialBalance, totalPayment, "Pool should receive the total payment amount");
     }
 }
