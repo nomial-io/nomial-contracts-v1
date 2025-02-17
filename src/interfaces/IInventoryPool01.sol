@@ -5,6 +5,8 @@ pragma solidity ^0.8.20;
 import {IInventoryPoolParams01} from "./IInventoryPoolParams01.sol";
 
 interface IInventoryPool01 {
+    event Borrowed(address indexed borrower, address indexed recipient, uint amount);
+
     function borrow(uint amount, address borrower, address recipient, uint expiry, uint chainId) external;
     function repay(uint amount, address borrower) external;
     function absolvePenalty (address borrower) external;

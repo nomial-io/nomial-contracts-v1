@@ -68,6 +68,8 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
         }
 
         IERC20(asset()).transfer(recipient, amount);
+
+        emit Borrowed(borrower, recipient, amount);
     }
 
     function repay(uint amount, address borrower) public nonReentrant() {
