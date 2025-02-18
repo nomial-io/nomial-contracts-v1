@@ -56,7 +56,7 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
         params = IInventoryPoolParams01(params_);
     }
 
-    function borrow(uint amount, address borrower, address recipient, uint expiry, uint chainId) external onlyOwner {
+    function borrow(uint amount, address borrower, address recipient, uint expiry, uint chainId) external nonReentrant() onlyOwner() {
         if (block.timestamp > expiry) revert Expired();
         if (block.chainid != chainId) revert WrongChainId();
 
@@ -74,59 +74,12 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
         emit Borrowed(borrower, recipient, amount);
     }
 
-    function repay(uint amount, address borrower) public nonReentrant() {
-        if (amount == 0) {
-          revert ZeroRepayment();
-        }
-
-        _updateAccumulatedInterestFactor();
-
-        uint baseDebt_ = _baseDebt(borrower, storedAccInterestFactor);
-        if (baseDebt_ == 0) {
-            revert NoDebt();
-        }
-
-        uint baseDebtPayment_ = amount;
-
-        uint penaltyDebt_ = _penaltyDebt(borrower, storedAccInterestFactor);
-        uint penaltyPayment_ = 0;
-        if (penaltyDebt_ > 0) {
-            if (baseDebtPayment_ > penaltyDebt_) {
-                baseDebtPayment_ -= penaltyDebt_;
-                penaltyPayment_ = penaltyDebt_;
-                borrowers[borrower].penaltyDebtPaid = 0;
-            } else {
-                borrowers[borrower].penaltyDebtPaid += amount;
-                penaltyPayment_ = amount;
-                baseDebtPayment_ = 0;
-            }
-            emit PenaltyRepayment(borrower, penaltyDebt_, penaltyPayment_);
-        }
-        
-        if (baseDebtPayment_ > 0) {
-            if (baseDebtPayment_ >= baseDebt_) {
-                borrowers[borrower].penaltyCounterStart = 0;
-                baseDebtPayment_ = baseDebt_;
-            } else {
-                uint period_ = params.penaltyPeriod();
-                uint paymentRatio_ = baseDebtPayment_.mulDiv(1e27, baseDebt_);
-                borrowers[borrower].penaltyCounterStart = block.timestamp - period_ + paymentRatio_.mulDiv(period_, 1e27);
-            }
-
-            uint scaledDebt_ = baseDebtPayment_.mulDiv(1e27, storedAccInterestFactor, Math.Rounding.Ceil);
-            borrowers[borrower].scaledDebt -= scaledDebt_;
-            scaledReceivables -= scaledDebt_;
-
-            emit BaseDebtRepayment(borrower, baseDebt_, baseDebtPayment_);
-        }
-
-        IERC20(asset()).safeTransferFrom(msg.sender, address(this), baseDebtPayment_ + penaltyPayment_);
+    function repay(uint amount, address borrower) public {
+        _repay(amount, borrower, false);
     }
 
-    function absolvePenalty (address borrower) public onlyOwner() {
-        BorrowerData storage b = borrowers[borrower];
-        b.penaltyCounterStart = 0;
-        b.penaltyDebtPaid = 0;
+    function repayOwnerOverride(uint amount, address borrower) public onlyOwner() {
+        _repay(amount, borrower, true);
     }
 
     function upgrageParamsContract (address params_) public onlyOwner() {
@@ -177,13 +130,64 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
             );
         }
     }
+
+    function _repay(uint amount, address borrower, bool ownerOverride) internal nonReentrant() {
+        if (amount == 0) {
+          revert ZeroRepayment();
+        }
+
+        _updateAccumulatedInterestFactor();
+
+        uint baseDebt_ = _baseDebt(borrower, storedAccInterestFactor);
+        if (baseDebt_ == 0) {
+            revert NoDebt();
+        }
+
+        uint baseDebtPayment_ = amount;
+
+        uint penaltyDebt_ = _penaltyDebt(borrower, storedAccInterestFactor);
+        uint penaltyPayment_ = 0;
+        if (penaltyDebt_ > 0) {
+            if (baseDebtPayment_ > penaltyDebt_) {
+                baseDebtPayment_ -= penaltyDebt_;
+                penaltyPayment_ = penaltyDebt_;
+                borrowers[borrower].penaltyDebtPaid = 0;
+            } else {
+                borrowers[borrower].penaltyDebtPaid += amount;
+                penaltyPayment_ = amount;
+                baseDebtPayment_ = 0;
+            }
+            emit PenaltyRepayment(borrower, penaltyDebt_, penaltyPayment_);
+        }
+        
+        if (baseDebtPayment_ > 0) {
+            if (baseDebtPayment_ >= baseDebt_) {
+                borrowers[borrower].penaltyCounterStart = 0;
+                baseDebtPayment_ = baseDebt_;
+            } else {
+                uint period_ = params.penaltyPeriod();
+                uint paymentRatio_ = baseDebtPayment_.mulDiv(1e27, baseDebt_);
+                borrowers[borrower].penaltyCounterStart = block.timestamp - period_ + paymentRatio_.mulDiv(period_, 1e27);
+            }
+
+            uint scaledDebt_ = baseDebtPayment_.mulDiv(1e27, storedAccInterestFactor, Math.Rounding.Ceil);
+            borrowers[borrower].scaledDebt -= scaledDebt_;
+            scaledReceivables -= scaledDebt_;
+
+            emit BaseDebtRepayment(borrower, baseDebt_, baseDebtPayment_);
+        }
+
+        if (!ownerOverride) {
+            IERC20(asset()).safeTransferFrom(msg.sender, address(this), baseDebtPayment_ + penaltyPayment_);
+        }
+    }
     
     function _deposit(
         address caller,
         address receiver,
         uint256 assets,
         uint256 shares
-    ) internal override {
+    ) internal override nonReentrant() {
         ERC4626._deposit(caller, receiver, assets, shares);
 
         _updateAccumulatedInterestFactor();
@@ -195,7 +199,7 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
         address owner,
         uint256 assets,
         uint256 shares
-    ) internal override {
+    ) internal override nonReentrant() {
         if (assets > IERC20(asset()).balanceOf(address(this))) {
             revert InsufficientLiquidity();
         }

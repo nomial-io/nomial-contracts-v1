@@ -500,4 +500,50 @@ contract InventoryPool01Test is Test, Helper {
         vm.expectRevert(InsufficientLiquidity.selector);
         wethInventoryPool.withdraw(200 * 10**18, addr1, addr1);
     }
+
+    function testInventoryPool01_repayOwnerOverride() public {
+        vm.prank(WETH_WHALE);
+        wethInventoryPool.deposit(1_000 * 10**18, poolOwner);
+
+        vm.warp(TEST_TIMESTAMP);
+
+        vm.prank(poolOwner);
+        wethInventoryPool.borrow(100 * 10**18, addr1, addr1, TEST_TIMESTAMP + 1 days, block.chainid);
+
+        uint penaltyPeriod = wethInventoryPool.params().penaltyPeriod();
+        vm.warp(TEST_TIMESTAMP + penaltyPeriod + 12 hours);
+
+        uint penaltyDebt = wethInventoryPool.penaltyDebt(addr1);
+        uint baseDebt = wethInventoryPool.baseDebt(addr1);
+        uint poolInitialBalance = IERC20(WETH).balanceOf(address(wethInventoryPool));
+
+        // Non-owner cannot call repayOwnerOverride
+        vm.prank(addr1);
+        vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", addr1));
+        wethInventoryPool.repayOwnerOverride(baseDebt + penaltyDebt, addr1);
+
+        vm.startPrank(poolOwner);
+        
+        // Expect both penalty and base debt repayment events
+        vm.expectEmit(true, false, false, true, address(wethInventoryPool));
+        emit IInventoryPool01.PenaltyRepayment(addr1, penaltyDebt, penaltyDebt);
+        
+        vm.expectEmit(true, false, false, true, address(wethInventoryPool));
+        emit IInventoryPool01.BaseDebtRepayment(addr1, baseDebt, baseDebt);
+        
+        wethInventoryPool.repayOwnerOverride(baseDebt + penaltyDebt, addr1);
+        vm.stopPrank();
+
+        // Verify all debt is cleared
+        assertEq(wethInventoryPool.penaltyDebt(addr1), 0, "Penalty debt should be cleared");
+        assertEq(wethInventoryPool.baseDebt(addr1), 0, "Base debt should be cleared");
+
+        // Verify penalty counter is reset
+        (,uint penaltyCounterStart,) = wethInventoryPool.borrowers(addr1);
+        assertEq(penaltyCounterStart, 0, "Penalty counter should be reset");
+
+        // Verify no ERC20 transfer occurred
+        uint poolFinalBalance = IERC20(WETH).balanceOf(address(wethInventoryPool));
+        assertEq(poolFinalBalance, poolInitialBalance, "Pool balance should remain unchanged");
+    }
 }
