@@ -487,4 +487,17 @@ contract InventoryPool01Test is Test, Helper {
 
         assertTrue(wethInventoryPool.storedAccInterestFactor() > preWithdrawAccInterestFactor, "Stored interest factor should have increased after withdraw");
     }
+
+    function testInventoryPool01_withdraw_insufficientLiquidity() public {
+        vm.prank(WETH_WHALE);
+        wethInventoryPool.deposit(1_000 * 10**18, addr1);
+
+        vm.prank(poolOwner);
+        wethInventoryPool.borrow(900 * 10**18, addr2, addr2, TEST_TIMESTAMP + 1 days, block.chainid);
+
+        // Try to withdraw more than available liquidity (1000 - 900 = 100 WETH available)
+        vm.prank(addr1);
+        vm.expectRevert(InsufficientLiquidity.selector);
+        wethInventoryPool.withdraw(200 * 10**18, addr1, addr1);
+    }
 }
