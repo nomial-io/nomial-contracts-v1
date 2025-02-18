@@ -72,4 +72,15 @@ contract InventoryPoolParams01Test is Test, Helper {
 
         assertEq(interestRate, expectedRate, "Interest rate should be correctly interpolated between optimal and full");
     }
+
+    function testInventoryPoolParams01_interestRate_exceedsMaxUtilization() public {
+        vm.expectRevert(InvalidUtilizationRate.selector);
+        params.interestRate(1e27 + 1);
+    }
+
+    function testInventoryPoolParams01_interestRate_atMaxUtilization() public {
+        uint interestRate = params.interestRate(1e27);
+        uint expectedRate = defaultBaseRate + defaultRate1 + defaultRate2;
+        assertEq(interestRate, expectedRate, "Interest rate at 100% utilization should be baseRate + rate1 + rate2");
+    }
 } 

@@ -6,6 +6,8 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {IInventoryPoolParams01} from "./interfaces/IInventoryPoolParams01.sol";
 
+error InvalidUtilizationRate();
+
 /**
  * @dev ...
  * ...
@@ -47,6 +49,8 @@ contract InventoryPoolParams01 is Ownable, IInventoryPoolParams01 {
 
     /* Rate for interest on borrows. Rate is per-second expressed in 1e27. Based on Aave v3 formula for utilization-based variable interest rate */
     function interestRate(uint utilizationRate_) external view returns (uint interestRate_){
+        if (utilizationRate_ > 1e27) revert InvalidUtilizationRate();
+
         if (utilizationRate_ <= _optimalUtilizationRate) {
             interestRate_ = _baseRate + _rate1.mulDiv(utilizationRate_, _optimalUtilizationRate);
         } else {
