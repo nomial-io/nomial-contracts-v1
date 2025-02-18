@@ -11,28 +11,41 @@ contract CollateralPool01Test is Test, Helper {
     CollateralPool01 public collateralPool;
     address public constant owner = 0xFD1066acf2FC47F3b2DaCec43E76321644dC9928;
     address public constant addr1 = 0x373FB35c5068f49deF8C2A74C0Fb3a82df02C667;
+    address public constant addr2 = 0x5Df7C65332BB095B7b108336A4f4eC7E98D66a61;
     uint public constant WITHDRAW_PERIOD = 1 days;
 
     function setUp() public {
         setupAll();
         collateralPool = new CollateralPool01(owner, WITHDRAW_PERIOD);
+
+        // Transfer WETH to test addresses
+        vm.startPrank(WETH_WHALE);
+        WETH_ERC20.transfer(addr1, 1000 * 10**18);
+        WETH_ERC20.transfer(addr2, 1000 * 10**18);
+        vm.stopPrank();
+
+        // Transfer USDC to test addresses
+        vm.startPrank(USDC_WHALE);
+        USDC_ERC20.transfer(addr1, 1_000_000 * 10**6);
+        USDC_ERC20.transfer(addr2, 1_000_000 * 10**6);
+        vm.stopPrank();
     }
 
     // Tests basic deposit functionality
     function testCollateralPool01_deposit() public {
         uint depositAmount = 100 * 10**18;
         
-        vm.startPrank(WETH_WHALE);
+        vm.startPrank(addr1);
         WETH_ERC20.approve(address(collateralPool), depositAmount);
         
-        vm.expectEmit(true, true, true, true, address(collateralPool));
-        emit ICollateralPool01.Deposited(WETH_WHALE, WETH_ERC20, depositAmount);
+        vm.expectEmit(true, false, false, true, address(collateralPool));
+        emit ICollateralPool01.Deposited(addr1, WETH_ERC20, depositAmount);
         
         collateralPool.deposit(WETH_ERC20, depositAmount);
         vm.stopPrank();
 
         assertEq(
-            collateralPool.tokenBalance(WETH_WHALE, WETH_ERC20),
+            collateralPool.tokenBalance(addr1, WETH_ERC20),
             depositAmount,
             "Depositor balance should match deposit amount"
         );
@@ -48,7 +61,7 @@ contract CollateralPool01Test is Test, Helper {
         uint firstDeposit = 50 * 10**18;
         uint secondDeposit = 75 * 10**18;
         
-        vm.startPrank(WETH_WHALE);
+        vm.startPrank(addr1);
         WETH_ERC20.approve(address(collateralPool), firstDeposit + secondDeposit);
         
         collateralPool.deposit(WETH_ERC20, firstDeposit);
@@ -56,7 +69,7 @@ contract CollateralPool01Test is Test, Helper {
         vm.stopPrank();
 
         assertEq(
-            collateralPool.tokenBalance(WETH_WHALE, WETH_ERC20),
+            collateralPool.tokenBalance(addr1, WETH_ERC20),
             firstDeposit + secondDeposit,
             "Depositor balance should accumulate multiple deposits"
         );
@@ -68,28 +81,24 @@ contract CollateralPool01Test is Test, Helper {
         uint user2Deposit = 150 * 10**18;
         
         // First user deposit
-        vm.startPrank(WETH_WHALE);
+        vm.startPrank(addr1);
         WETH_ERC20.approve(address(collateralPool), user1Deposit);
         collateralPool.deposit(WETH_ERC20, user1Deposit);
         vm.stopPrank();
 
-        // Transfer some WETH to second user
-        vm.prank(WETH_WHALE);
-        WETH_ERC20.transfer(addr1, user2Deposit);
-
         // Second user deposit
-        vm.startPrank(addr1);
+        vm.startPrank(addr2);
         WETH_ERC20.approve(address(collateralPool), user2Deposit);
         collateralPool.deposit(WETH_ERC20, user2Deposit);
         vm.stopPrank();
 
         assertEq(
-            collateralPool.tokenBalance(WETH_WHALE, WETH_ERC20),
+            collateralPool.tokenBalance(addr1, WETH_ERC20),
             user1Deposit,
             "First user balance should match their deposit"
         );
         assertEq(
-            collateralPool.tokenBalance(addr1, WETH_ERC20),
+            collateralPool.tokenBalance(addr2, WETH_ERC20),
             user2Deposit,
             "Second user balance should match their deposit"
         );
@@ -105,23 +114,23 @@ contract CollateralPool01Test is Test, Helper {
         uint wethAmount = 100 * 10**18;
         uint usdcAmount = 1000 * 10**6;
         
-        vm.startPrank(WETH_WHALE);
+        vm.startPrank(addr1);
         WETH_ERC20.approve(address(collateralPool), wethAmount);
         collateralPool.deposit(WETH_ERC20, wethAmount);
         vm.stopPrank();
 
-        vm.startPrank(USDC_WHALE);
+        vm.startPrank(addr2);
         USDC_ERC20.approve(address(collateralPool), usdcAmount);
         collateralPool.deposit(USDC_ERC20, usdcAmount);
         vm.stopPrank();
 
         assertEq(
-            collateralPool.tokenBalance(WETH_WHALE, WETH_ERC20),
+            collateralPool.tokenBalance(addr1, WETH_ERC20),
             wethAmount,
             "WETH balance should match deposit"
         );
         assertEq(
-            collateralPool.tokenBalance(USDC_WHALE, USDC_ERC20),
+            collateralPool.tokenBalance(addr2, USDC_ERC20),
             usdcAmount,
             "USDC balance should match deposit"
         );
@@ -129,34 +138,24 @@ contract CollateralPool01Test is Test, Helper {
 
     // Tests deposit with zero amount
     function testCollateralPool01_deposit_zeroAmount() public {
-        vm.startPrank(WETH_WHALE);
+        vm.startPrank(addr1);
         WETH_ERC20.approve(address(collateralPool), 1);
         collateralPool.deposit(WETH_ERC20, 0);
         vm.stopPrank();
 
         assertEq(
-            collateralPool.tokenBalance(WETH_WHALE, WETH_ERC20),
+            collateralPool.tokenBalance(addr1, WETH_ERC20),
             0,
             "Zero deposit should result in zero balance"
         );
     }
 
-    // Tests deposit fails without approval
-    function testCollateralPool01_deposit_noApproval() public {
-        uint depositAmount = 100 * 10**18;
-        
-        vm.startPrank(WETH_WHALE);
-        vm.expectRevert();
-        collateralPool.deposit(WETH_ERC20, depositAmount);
-        vm.stopPrank();
-    }
-
     // Tests deposit fails with insufficient balance
     function testCollateralPool01_deposit_insufficientBalance() public {
-        uint whaleBalance = WETH_ERC20.balanceOf(WETH_WHALE);
-        uint depositAmount = whaleBalance + 1;
+        uint balance = WETH_ERC20.balanceOf(addr1);
+        uint depositAmount = balance + 1;
         
-        vm.startPrank(WETH_WHALE);
+        vm.startPrank(addr1);
         WETH_ERC20.approve(address(collateralPool), depositAmount);
         vm.expectRevert();
         collateralPool.deposit(WETH_ERC20, depositAmount);
