@@ -26,12 +26,11 @@ struct BorrowerData {
 
 /**
  * @title InventoryPool01
- * @dev An ERC4626-compliant lending pool that allows borrowing against deposited assets.
+ * @dev An ERC4626-compliant lending pool that allows borrowing by the pool owner and tracks debt
  * Features include:
  * - Variable interest rates based on pool utilization
  * - Penalty interest for overdue loans
- * - Owner-controlled borrowing permissions
- * - Protection against inflation attacks
+ * - Repayment of both base debt and penalty debt
  * All rates and calculations use 1e27 precision for accurate interest accrual
  */
 contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardTransient {
@@ -108,19 +107,20 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
 
     /**
      * @notice Allows owner to forgive debt without requiring asset transfer
-     * @dev Similar to repay() but doesn't require actual asset transfer.
-     * Useful for handling bad debt or special arrangements.
+     * @dev Similar to repay() but doesn't require actual asset transfer
      * @param amount The amount of debt to forgive
      * @param borrower The address whose debt is being forgiven
+     * @custom:revert ZeroRepayment If amount is 0
+     * @custom:revert NoDebt If the borrower has no outstanding debt
      */
-    function repayOwnerOverride(uint amount, address borrower) public onlyOwner() {
+    function forgiveDebt(uint amount, address borrower) public onlyOwner() {
         _repay(amount, borrower, true);
     }
 
     /**
-     * @notice Updates the parameters contract address
-     * @dev Allows upgrading to a new parameters contract while maintaining the same pool logic
-     * @param params_ The address of the new parameters contract
+     * @notice Updates the InventoryPoolParams01 contract address
+     * @dev Allows upgrading to a new parameters contract while maintaining the same pool
+     * @param params_ The address of the new InventoryPoolParams01 contract
      */
     function upgrageParamsContract(address params_) public onlyOwner() {
         params = IInventoryPoolParams01(params_);
@@ -137,7 +137,7 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
 
     /**
      * @notice Returns the total amount of debt owed to the pool
-     * @dev Includes both base debt and accrued interest for all borrowers
+     * @dev Includes both base debt and accrued interest for all borrowers. Does not include penalty debt
      * @return The total receivables amount
      */
     function totalReceivables() public view returns (uint) {
@@ -147,7 +147,6 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
     /**
      * @notice Calculates the current utilization rate of the pool
      * @dev Utilization = Total Receivables / Total Assets
-     * Used to determine the current interest rate
      * @return The utilization rate in 1e27 precision
      */
     function utilizationRate() public view returns (uint) {
@@ -160,8 +159,8 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
      * @notice Returns the current base debt for a borrower
      * @dev Base debt includes the original borrowed amount plus accrued interest,
      * but excludes any penalty interest
-     * @param borrower The address to check
-     * @return The current base debt amount
+     * @param borrower The borrower's address
+     * @return The current base debt amount for the borrower
      */
     function baseDebt(address borrower) public view returns (uint) {
         return _baseDebt(borrower, accumulatedInterestFactor());
@@ -171,8 +170,8 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
      * @notice Returns the current penalty debt for a borrower
      * @dev Penalty debt only exists after the penalty period has passed
      * and is calculated based on the penalty rate
-     * @param borrower The address to check
-     * @return The current penalty debt amount
+     * @param borrower The borrower's address
+     * @return The current penalty debt amount for the borrower
      */
     function penaltyDebt(address borrower) public view returns (uint) {
         return _penaltyDebt(borrower, accumulatedInterestFactor());
@@ -181,8 +180,8 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
     /**
      * @notice Returns how long a borrower has been in the penalty period
      * @dev Returns 0 if not in penalty period, otherwise returns seconds since penalty started
-     * @param borrower The address to check
-     * @return The number of seconds in penalty period, or 0 if not in penalty
+     * @param borrower The borrower's address
+     * @return The number of seconds in penalty period, or 0 if not in penalty period
      */
     function penaltyTime(address borrower) public view returns (uint) {
         uint penaltyCounterStart = borrowers[borrower].penaltyCounterStart;
@@ -195,6 +194,11 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
         return 0;
     }
 
+    /**
+     * @notice Returns the accumulated interest factor for the pool
+     * @dev Used to calculate the base debt for borrowers
+     * @return The accumulated interest factor in 1e27 precision
+     */
     function accumulatedInterestFactor() public view returns (uint) {
         if (storedAccInterestFactor == 0) {
             return 1e27;
@@ -207,7 +211,16 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
         }
     }
 
-    function _repay(uint amount, address borrower, bool ownerOverride) internal nonReentrant() {
+    /**
+     * @notice Internal function to handle debt repayment
+     * @dev Handles both base debt and penalty debt repayment
+     * @param amount The amount of assets to repay
+     * @param borrower The borrower's address
+     * @param forgive If true, debt is forgiven without requiring asset transfer
+     * @custom:revert ZeroRepayment If amount is 0
+     * @custom:revert NoDebt If the borrower has no outstanding debt
+     */
+    function _repay(uint amount, address borrower, bool forgive) internal nonReentrant() {
         if (amount == 0) {
           revert ZeroRepayment();
         }
@@ -253,11 +266,20 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
             emit BaseDebtRepayment(borrower, baseDebt_, baseDebtPayment_);
         }
 
-        if (!ownerOverride) {
+        if (!forgive) {
             IERC20(asset()).safeTransferFrom(msg.sender, address(this), baseDebtPayment_ + penaltyPayment_);
         }
     }
-    
+
+    /**
+     * @notice ERC4626 override to handle deposit
+     * @dev Updates the accumulated interest factor after deposit, because deposit will decrease
+     * the utlization rate which will decrease the pool's interest rate
+     * @param caller The caller's address
+     * @param receiver The receiver's address
+     * @param assets The amount of assets to deposit
+     * @param shares The amount of shares to mint
+     */
     function _deposit(
         address caller,
         address receiver,
@@ -269,6 +291,18 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
         _updateAccumulatedInterestFactor();
     }
 
+    /**
+     * @notice ERC4626 override to handle withdraw
+     * @dev Updates the accumulated interest factor after withdraw, because withdraw will increase
+     * the utlization rate which will increase the pool's interest rate. If a shareholder owns more
+     * shares than the amount of unborrowed assets, the shareholder can only withdraw up to the amount
+     * of unborrowed assets, otherwise an InsufficientLiquidity error will be thrown.
+     * @param caller The caller's address
+     * @param receiver The receiver's address
+     * @param owner The owner's address
+     * @param assets The amount of assets to withdraw
+     * @param shares The amount of shares to burn
+     */
     function _withdraw(
         address caller,
         address receiver,
@@ -284,25 +318,55 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
         _updateAccumulatedInterestFactor();
     }
 
+    /**
+     * @notice Internal function to update the accumulated interest factor
+     * @dev Updates the stored accumulated interest factor and the last update timestamp
+     */
     function _updateAccumulatedInterestFactor () internal {
         storedAccInterestFactor = accumulatedInterestFactor();
         lastAccumulatedInterestUpdate = block.timestamp;
     }
 
+    /**
+     * @notice Internal function to calculate the utilization rate
+     * @dev Utilization rate = Total Receivables / Total Assets
+     * @param accInterestFactor The accumulated interest factor
+     * @return The utilization rate in 1e27 precision
+     */
     function _utilizationRate(uint accInterestFactor) internal view returns (uint) {
         uint totalReceivables_ = _totalReceivables(accInterestFactor);
         uint totalAssets_ = totalReceivables_ + IERC20(asset()).balanceOf(address(this));
         return totalReceivables_.mulDiv(1e27, totalAssets_);
     }
 
+    /**
+     * @notice Internal function to calculate the total receivables
+     * @dev Total receivables = scaled receivables * accumulated interest factor
+     * @param accInterestFactor The accumulated interest factor
+     * @return The total receivables amount
+     */
     function _totalReceivables(uint accInterestFactor) internal view returns (uint) {
         return scaledReceivables.mulDiv(accInterestFactor, 1e27);
     }
 
+    /**
+     * @notice Internal function to calculate the base debt for a borrower
+     * @dev Base debt = scaled debt * accumulated interest factor
+     * @param borrower The borrower's address
+     * @param accInterestFactor The accumulated interest factor
+     * @return The base debt amount for the borrower
+     */
     function _baseDebt(address borrower, uint accInterestFactor) internal view returns (uint) {
         return borrowers[borrower].scaledDebt.mulDiv(accInterestFactor, 1e27);
     }
 
+    /**
+     * @notice Internal function to calculate the penalty debt for a borrower
+     * @dev Penalty debt = (base debt * penalty time * penalty rate) - penalty debt paid
+     * @param borrower The borrower's address
+     * @param accInterestFactor The accumulated interest factor
+     * @return The penalty debt amount for the borrower
+     */
     function _penaltyDebt(address borrower, uint accInterestFactor) internal view returns (uint) {
         uint penaltyTime_ = penaltyTime(borrower);
         if (penaltyTime_ == 0) return 0;
@@ -310,8 +374,11 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
         return (_baseDebt(borrower, accInterestFactor) * penaltyTime_).mulDiv(params.penaltyRate(), 1e27) - borrowers[borrower].penaltyDebtPaid;
     }
 
+    /**
+     * @notice Fallback function to prevent accidental ETH deposits
+     * @dev Reverts if ETH is transferred to the pool
+     */
     receive() external payable {
         revert NotSupported();
     }
-
 }

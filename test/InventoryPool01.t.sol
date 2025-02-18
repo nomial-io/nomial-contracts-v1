@@ -520,7 +520,7 @@ contract InventoryPool01Test is Test, Helper {
     }
 
     // Tests owner's ability to forgive debt without asset transfer
-    function testInventoryPool01_repayOwnerOverride() public {
+    function testInventoryPool01_forgiveDebt() public {
         vm.prank(WETH_WHALE);
         wethInventoryPool.deposit(1_000 * 10**18, poolOwner);
 
@@ -536,10 +536,10 @@ contract InventoryPool01Test is Test, Helper {
         uint baseDebt = wethInventoryPool.baseDebt(addr1);
         uint poolInitialBalance = IERC20(WETH).balanceOf(address(wethInventoryPool));
 
-        // Non-owner cannot call repayOwnerOverride
+        // Non-owner cannot call forgiveDebt
         vm.prank(addr1);
         vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", addr1));
-        wethInventoryPool.repayOwnerOverride(baseDebt + penaltyDebt, addr1);
+        wethInventoryPool.forgiveDebt(baseDebt + penaltyDebt, addr1);
 
         vm.startPrank(poolOwner);
         
@@ -550,7 +550,7 @@ contract InventoryPool01Test is Test, Helper {
         vm.expectEmit(true, false, false, true, address(wethInventoryPool));
         emit IInventoryPool01.BaseDebtRepayment(addr1, baseDebt, baseDebt);
         
-        wethInventoryPool.repayOwnerOverride(baseDebt + penaltyDebt, addr1);
+        wethInventoryPool.forgiveDebt(baseDebt + penaltyDebt, addr1);
         vm.stopPrank();
 
         // Verify all debt is cleared
@@ -564,5 +564,11 @@ contract InventoryPool01Test is Test, Helper {
         // Verify no ERC20 transfer occurred
         uint poolFinalBalance = IERC20(WETH).balanceOf(address(wethInventoryPool));
         assertEq(poolFinalBalance, poolInitialBalance, "Pool balance should remain unchanged");
+    }
+
+    // Tests receive function reverts ETH transfers
+    function testInventoryPool01_receive() public {
+        vm.expectRevert(NotSupported.selector);
+        address(wethInventoryPool).call{value: 1 ether}("");
     }
 }
