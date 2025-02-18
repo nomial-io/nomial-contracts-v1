@@ -538,4 +538,30 @@ contract CollateralPool01Test is Test, Helper {
         assertEq(address(token), address(initialToken), "Token should remain unchanged");
         assertEq(startTime, initialStartTime, "Start time should remain unchanged");
     }
+
+    // Tests updateWithdrawPeriod state change and event emission
+    function testCollateralPool01_updateWithdrawPeriod() public {
+        uint newWithdrawPeriod = 2 days;
+
+        // Expect WithdrawPeriodUpdated event
+        vm.expectEmit(false, false, false, true, address(collateralPool));
+        emit ICollateralPool01.WithdrawPeriodUpdated(newWithdrawPeriod);
+
+        // Update withdraw period
+        vm.prank(owner);
+        collateralPool.updateWithdrawPeriod(newWithdrawPeriod);
+
+        // Verify state change
+        assertEq(
+            collateralPool.withdrawPeriod(),
+            newWithdrawPeriod,
+            "Withdraw period should be updated"
+        );
+    }
+
+    // Tests that sending ETH to the contract reverts
+    function testCollateralPool01_receive() public {
+        vm.expectRevert(NotSupported.selector);
+        address(collateralPool).call{value: 1 ether}("");
+    }
 }
