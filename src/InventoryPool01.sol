@@ -111,7 +111,7 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
                 borrowers[borrower].penaltyCounterStart = block.timestamp - period_ + paymentRatio_.mulDiv(period_, 1e27);
             }
 
-            uint scaledDebt_ = baseDebtPayment_.mulDiv(1e27, storedAccInterestFactor);
+            uint scaledDebt_ = baseDebtPayment_.mulDiv(1e27, storedAccInterestFactor, Math.Rounding.Ceil);
             borrowers[borrower].scaledDebt -= scaledDebt_;
             scaledReceivables -= scaledDebt_;
 

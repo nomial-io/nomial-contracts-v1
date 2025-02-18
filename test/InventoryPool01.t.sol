@@ -307,7 +307,7 @@ contract InventoryPool01Test is Test, Helper {
         assertEq(poolFinalBalance - poolInitialBalance, partialRepayment, "Pool should receive the penalty payment amount");
     }
 
-    function testInventoryPool01_repay_penaltyAndBaseDebt() public {
+    function testInventoryPool01_repay_penaltyAndPartialBaseDebt() public {
         vm.prank(WETH_WHALE);
         wethInventoryPool.deposit(1_000 * 10**18, poolOwner);
 
@@ -324,6 +324,10 @@ contract InventoryPool01Test is Test, Helper {
         uint penaltyDebt = wethInventoryPool.penaltyDebt(addr1);
         uint baseDebt = wethInventoryPool.baseDebt(addr1);
         uint totalPayment = penaltyDebt + (baseDebt / 2);  // Pay all penalty debt plus half of base debt
+
+        // Transfer WETH to addr1 for repayment
+        vm.prank(WETH_WHALE);
+        WETH_ERC20.transfer(addr1, totalPayment);
 
         // Get initial balances
         uint poolInitialBalance = IERC20(WETH).balanceOf(address(wethInventoryPool));
@@ -366,6 +370,51 @@ contract InventoryPool01Test is Test, Helper {
         );
 
         // Verify ERC20 transfer to pool
+        uint poolFinalBalance = IERC20(WETH).balanceOf(address(wethInventoryPool));
+        assertEq(poolFinalBalance - poolInitialBalance, totalPayment, "Pool should receive the total payment amount");
+    }
+
+    function testInventoryPool01_repay_fullPenaltyAndBaseDebt() public {
+        vm.warp(TEST_TIMESTAMP);
+
+        vm.startPrank(WETH_WHALE);
+        wethInventoryPool.deposit(1_000 * 10**18, poolOwner);
+        WETH_ERC20.transfer(addr1, 1 * 10**18);
+        vm.stopPrank();
+        
+        vm.prank(poolOwner);
+        wethInventoryPool.borrow(100 * 10**18, addr1, addr1, TEST_TIMESTAMP + 1 days, block.chainid);
+
+        // Move past penalty period and accrue some penalty debt
+        uint penaltyPeriod = wethInventoryPool.params().penaltyPeriod();
+        vm.warp(TEST_TIMESTAMP + penaltyPeriod + 12 hours);
+        
+        uint penaltyDebt = wethInventoryPool.penaltyDebt(addr1);
+        uint baseDebt = wethInventoryPool.baseDebt(addr1);
+
+        // Pay all penalty debt plus all base debt
+        uint totalPayment = penaltyDebt + baseDebt;
+
+        uint poolInitialBalance = IERC20(WETH).balanceOf(address(wethInventoryPool));
+
+        vm.startPrank(addr1);
+        WETH_ERC20.approve(address(wethInventoryPool), totalPayment);
+
+        vm.expectEmit(true, false, false, true, address(wethInventoryPool));
+        emit IInventoryPool01.PenaltyRepayment(addr1, penaltyDebt, penaltyDebt);
+
+        vm.expectEmit(true, false, false, true, address(wethInventoryPool));
+        emit IInventoryPool01.BaseDebtRepayment(addr1, baseDebt, baseDebt);
+        
+        wethInventoryPool.repay(totalPayment, addr1);
+        vm.stopPrank();
+
+        assertEq(wethInventoryPool.penaltyDebt(addr1), 0, "No penalty debt should remain");
+        assertEq(wethInventoryPool.baseDebt(addr1), 0, "No base debt should remain");
+
+        (,uint penaltyCounterStart,) = wethInventoryPool.borrowers(addr1);
+        assertEq(penaltyCounterStart, 0, "Penalty counter should be reset");
+
         uint poolFinalBalance = IERC20(WETH).balanceOf(address(wethInventoryPool));
         assertEq(poolFinalBalance - poolInitialBalance, totalPayment, "Pool should receive the total payment amount");
     }
