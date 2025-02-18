@@ -6,19 +6,14 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
-
-error InsufficientBalance(uint balance);
-error NothingToWithdraw();
-error WithdrawNotReady(uint withdrawReadyTime);
-error InsufficientLiquidity(uint amount);
-error NotSupported();
-
-event Deposited(address depositor, IERC20 token, uint amount);
-event WithdrawRequested(uint nonce, uint startTime, address depositor, IERC20 token, uint amount);
-event WithdrawCompleted(uint nonce, address depositor, IERC20 token, uint amount);
-event WithdrawPeriodUpdated(uint withdrawPeriod);
-event BalanceLiquidated(address depositor, IERC20 token, uint amount, address recipient);
-event WithdrawLiquidated(uint nonce, address depositor, IERC20 token, uint amount, address recipient);
+import {
+    ICollateralPool01,
+    InsufficientBalance,
+    NothingToWithdraw,
+    WithdrawNotReady,
+    InsufficientLiquidity,
+    NotSupported
+} from "./interfaces/ICollateralPool01.sol";
 
 struct TokenWithdraw {
     IERC20 token;
@@ -30,7 +25,7 @@ struct TokenWithdraw {
  * @dev ...
  * ...
  */
-contract CollateralPool01 is Ownable, ReentrancyGuardTransient {
+contract CollateralPool01 is ICollateralPool01, Ownable, ReentrancyGuardTransient {
     using SafeERC20 for IERC20;
 
     uint public withdrawPeriod;
@@ -61,7 +56,7 @@ contract CollateralPool01 is Ownable, ReentrancyGuardTransient {
         withdrawNonce[msg.sender] += 1;
         tokenWithdraws[msg.sender][withdrawNonce[msg.sender]] = TokenWithdraw(token, block.timestamp, amount);
 
-        emit WithdrawRequested(withdrawNonce[msg.sender], block.timestamp, msg.sender, token, amount);
+        emit WithdrawRequested(msg.sender, withdrawNonce[msg.sender], block.timestamp, token, amount);
     }
 
     function withdraw(uint nonce) public nonReentrant() {
@@ -81,7 +76,7 @@ contract CollateralPool01 is Ownable, ReentrancyGuardTransient {
         delete tokenWithdraws[msg.sender][nonce];
         token.safeTransfer(msg.sender, amount);
 
-        emit WithdrawCompleted(nonce, msg.sender, token, amount);
+        emit WithdrawCompleted(msg.sender, nonce, token, amount);
     }
 
     function liquidateBalance(address depositor, IERC20 token, uint amount, address recipient) public onlyOwner() {
@@ -108,7 +103,7 @@ contract CollateralPool01 is Ownable, ReentrancyGuardTransient {
         }
         _tokenWithdraw.token.safeTransfer(recipient, amount);
 
-        emit WithdrawLiquidated(nonce, depositor, _tokenWithdraw.token, amount, recipient);
+        emit WithdrawLiquidated(depositor, nonce, _tokenWithdraw.token, amount, recipient);
     }
 
     function updateWithdrawPeriod(uint _withdrawPeriod) public onlyOwner() {
