@@ -57,6 +57,7 @@ contract InventoryPool01Test is Test, Helper {
         WETH_ERC20.approve(address(wethInventoryPool), MAX_UINT);
     }
 
+    // Verifies borrow fails when chain ID doesn't match
     function testInventoryPool01_borrow_wrongChainId() public {
         vm.prank(WETH_WHALE);
         wethInventoryPool.deposit(1_000 * 10**18, addr1);
@@ -67,6 +68,7 @@ contract InventoryPool01Test is Test, Helper {
         wethInventoryPool.borrow(1*10**18, addr1, addr2, TEST_TIMESTAMP + 1 days, block.chainid + 1);
     }
 
+    // Verifies borrow fails with expired timestamp
     function testInventoryPool01_borrow_expired() public {
         vm.prank(WETH_WHALE);
         wethInventoryPool.deposit(1_000 * 10**18, addr1);
@@ -77,6 +79,7 @@ contract InventoryPool01Test is Test, Helper {
         wethInventoryPool.borrow(1*10**18, addr1, addr2, TEST_TIMESTAMP - 1, block.chainid);
     }
 
+    // Checks initial borrow state: base debt, penalty time, and fee calculation
     function testInventoryPool01_borrow_initialState() public {
         vm.prank(WETH_WHALE);
         wethInventoryPool.deposit(1_000 * 10**18, addr1);
@@ -100,6 +103,7 @@ contract InventoryPool01Test is Test, Helper {
         assertEq(penaltyDebt, 0, "Penalty debt should be 0");
     }
 
+    // Verifies interest accumulation for borrowed position
     function testInventoryPool01_borrow_accumulatedInterest() public {
         vm.prank(WETH_WHALE);
         wethInventoryPool.deposit(1_000 * 10**18, addr1);
@@ -122,6 +126,7 @@ contract InventoryPool01Test is Test, Helper {
         assertEq(newBaseDebt, expectedDebt, "Base debt should reflect 1 hour of interest");
     }
 
+    // Verifies penalty debt calculation after penalty period
     function testInventoryPool01_borrow_penaltyAfterPeriod() public {
         vm.prank(WETH_WHALE);
         wethInventoryPool.deposit(1_000 * 10**18, addr1);
@@ -147,6 +152,7 @@ contract InventoryPool01Test is Test, Helper {
         assertEq(penaltyDebt, expectedPenaltyDebt, "Penalty debt should accumulate at penalty rate");
     }
 
+    // Tests ERC4626 inflation attack mitigation
     function testInventoryPool01_inflationAttack () public {
         // Attacker deposits minimal amount
         vm.prank(WETH_WHALE);
@@ -176,6 +182,7 @@ contract InventoryPool01Test is Test, Helper {
         assertEq(addr2Balance, 1 * 10**18 - 48, "Second LP should get their deposit minus some dust");
     }
 
+    // Verifies borrowed assets are transferred to recipient
     function testInventoryPool01_borrow_transferToRecipient() public {
         vm.prank(WETH_WHALE);
         wethInventoryPool.deposit(1_000 * 10**18, poolOwner);
@@ -190,6 +197,7 @@ contract InventoryPool01Test is Test, Helper {
         assertEq(recipientFinalBalance - recipientInitialBalance, borrowAmount, "Recipient should receive the borrowed ERC20 amount");
     }
 
+    // Verifies Borrowed event is emitted with correct parameters
     function testInventoryPool01_borrow_emitEvent() public {
         vm.prank(WETH_WHALE);
         wethInventoryPool.deposit(1_000 * 10**18, poolOwner);
@@ -204,6 +212,7 @@ contract InventoryPool01Test is Test, Helper {
         wethInventoryPool.borrow(borrowAmount, addr1, addr2, TEST_TIMESTAMP + 1 days, block.chainid);
     }
 
+    // Tests interest rate changes with different utilization levels
     function testInventoryPool01_borrow_variableInterestRate() public {
         vm.prank(WETH_WHALE);
         wethInventoryPool.deposit(1_000 * 10**18, poolOwner);
@@ -250,6 +259,7 @@ contract InventoryPool01Test is Test, Helper {
         assertEq(addr2Debt, addr2ExpectedDebt, "Second borrower should reflect only the higher interest rate period");
     }
 
+    // Verifies repay fails with zero amount
     function testInventoryPool01_repay_zeroRepayment() public {
         vm.prank(WETH_WHALE);
         wethInventoryPool.deposit(1_000 * 10**18, poolOwner);
@@ -261,6 +271,7 @@ contract InventoryPool01Test is Test, Helper {
         wethInventoryPool.repay(0, addr1);
     }
 
+    // Verifies repay fails when borrower has no debt
     function testInventoryPool01_repay_noDebt() public {
         vm.prank(WETH_WHALE);
         wethInventoryPool.deposit(1_000 * 10**18, poolOwner);
@@ -269,6 +280,7 @@ contract InventoryPool01Test is Test, Helper {
         wethInventoryPool.repay(1 * 10**18, addr1);
     }
 
+    // Tests partial repayment of penalty debt
     function testInventoryPool01_repay_penaltyDebtPartial() public {
         vm.prank(WETH_WHALE);
         wethInventoryPool.deposit(1_000 * 10**18, poolOwner);
@@ -308,6 +320,7 @@ contract InventoryPool01Test is Test, Helper {
         assertEq(poolFinalBalance - poolInitialBalance, partialRepayment, "Pool should receive the penalty payment amount");
     }
 
+    // Tests repaying all penalty debt plus partial base debt
     function testInventoryPool01_repay_penaltyAndPartialBaseDebt() public {
         vm.prank(WETH_WHALE);
         wethInventoryPool.deposit(1_000 * 10**18, poolOwner);
@@ -375,6 +388,7 @@ contract InventoryPool01Test is Test, Helper {
         assertEq(poolFinalBalance - poolInitialBalance, totalPayment, "Pool should receive the total payment amount");
     }
 
+    // Tests full repayment of both penalty and base debt
     function testInventoryPool01_repay_fullPenaltyAndBaseDebt() public {
         vm.warp(TEST_TIMESTAMP);
 
@@ -420,6 +434,7 @@ contract InventoryPool01Test is Test, Helper {
         assertEq(poolFinalBalance - poolInitialBalance, totalPayment, "Pool should receive the total payment amount");
     }
 
+    // Tests handling of repayment amount exceeding total debt
     function testInventoryPool01_repay_baseDebtOverpayment() public {
         vm.warp(TEST_TIMESTAMP);
 
@@ -454,6 +469,7 @@ contract InventoryPool01Test is Test, Helper {
         assertEq(poolFinalBalance - poolInitialBalance, baseDebt, "Pool should receive only the actual debt amount");
     }
 
+    // Verifies interest factor updates on deposit
     function testInventoryPool01_deposit_updatesAccumulatedInterestFactor() public {
         vm.prank(WETH_WHALE);
         wethInventoryPool.deposit(1_000 * 10**18, addr1);
@@ -471,6 +487,7 @@ contract InventoryPool01Test is Test, Helper {
         assertTrue(wethInventoryPool.storedAccInterestFactor() > preDepositAccInterestFactor, "Stored interest factor should have increased after deposit");
     }
 
+    // Verifies interest factor updates on withdraw
     function testInventoryPool01_withdraw_updatesAccumulatedInterestFactor() public {
         vm.prank(WETH_WHALE);
         wethInventoryPool.deposit(1_000 * 10**18, addr1);
@@ -488,6 +505,7 @@ contract InventoryPool01Test is Test, Helper {
         assertTrue(wethInventoryPool.storedAccInterestFactor() > preWithdrawAccInterestFactor, "Stored interest factor should have increased after withdraw");
     }
 
+    // Tests withdraw fails with insufficient pool liquidity
     function testInventoryPool01_withdraw_insufficientLiquidity() public {
         vm.prank(WETH_WHALE);
         wethInventoryPool.deposit(1_000 * 10**18, addr1);
@@ -501,6 +519,7 @@ contract InventoryPool01Test is Test, Helper {
         wethInventoryPool.withdraw(200 * 10**18, addr1, addr1);
     }
 
+    // Tests owner's ability to forgive debt without asset transfer
     function testInventoryPool01_repayOwnerOverride() public {
         vm.prank(WETH_WHALE);
         wethInventoryPool.deposit(1_000 * 10**18, poolOwner);

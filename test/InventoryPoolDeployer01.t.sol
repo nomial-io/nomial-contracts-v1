@@ -17,7 +17,8 @@ contract InventoryPoolDeployer01Test is Test, Helper {
         inventoryPoolDeployer01 = new InventoryPoolDeployer01();
     }
 
-    function testInventoryPoolDeployer01_poolAddress () public {
+    // Tests computed pool address matches deployed address
+    function testInventoryPoolDeployer01_poolAddress() public {
         address paramsAddr = inventoryPoolDeployer01.inventoryPoolParamsAddress(
             salt,
             owner,
