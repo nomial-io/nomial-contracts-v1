@@ -6,7 +6,7 @@ import {Test} from "forge-std/Test.sol";
 import {console} from "forge-std/console.sol";
 import "../src/InventoryPool01.sol";
 import "../src/InventoryPoolDeployer01.sol";
-import {InvalidUtilizationRate} from "../src/InventoryPoolParams01.sol";
+import {InvalidUtilizationRate} from "../src/interfaces/IInventoryPoolParams01.sol";
 import "./Helper.sol";
 
 contract InventoryPool01Test is Test, Helper {

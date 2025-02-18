@@ -7,15 +7,16 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {IInventoryPool01} from "./interfaces/IInventoryPool01.sol";
+import {
+    IInventoryPool01,
+    NotSupported,
+    Expired,
+    NoDebt,
+    ZeroRepayment,
+    InsufficientLiquidity,
+    WrongChainId
+} from "./interfaces/IInventoryPool01.sol";
 import {IInventoryPoolParams01} from "./interfaces/IInventoryPoolParams01.sol";
-
-error NotSupported();
-error Expired();
-error NoDebt();
-error ZeroRepayment();
-error InsufficientLiquidity();
-error WrongChainId();
 
 struct BorrowerData {
     uint scaledDebt;

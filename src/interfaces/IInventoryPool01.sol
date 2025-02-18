@@ -4,6 +4,13 @@ pragma solidity ^0.8.20;
 
 import {IInventoryPoolParams01} from "./IInventoryPoolParams01.sol";
 
+error NotSupported();
+error Expired();
+error NoDebt();
+error ZeroRepayment();
+error InsufficientLiquidity();
+error WrongChainId();
+
 interface IInventoryPool01 {
     event Borrowed(address indexed borrower, address indexed recipient, uint amount);
     event PenaltyRepayment(address indexed borrower, uint penaltyDebt, uint penaltyPaymentAmount);
