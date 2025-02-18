@@ -453,4 +453,39 @@ contract InventoryPool01Test is Test, Helper {
         uint poolFinalBalance = IERC20(WETH).balanceOf(address(wethInventoryPool));
         assertEq(poolFinalBalance - poolInitialBalance, baseDebt, "Pool should receive only the actual debt amount");
     }
+
+    function testInventoryPool01_deposit_updatesAccumulatedInterestFactor() public {
+        vm.prank(WETH_WHALE);
+        wethInventoryPool.deposit(1_000 * 10**18, addr1);
+
+        vm.prank(poolOwner);
+        wethInventoryPool.borrow(100 * 10**18, addr1, addr1, TEST_TIMESTAMP + 1 days, block.chainid);
+
+        uint preDepositAccInterestFactor = wethInventoryPool.accumulatedInterestFactor();
+
+        vm.warp(TEST_TIMESTAMP + 1 hours);
+
+        vm.prank(WETH_WHALE);
+        wethInventoryPool.deposit(10 * 10**18, addr2);
+
+        assertTrue(wethInventoryPool.storedAccInterestFactor() > preDepositAccInterestFactor, "Stored interest factor should have increased after deposit");
+    }
+
+    function testInventoryPool01_withdraw_updatesAccumulatedInterestFactor() public {
+        vm.prank(WETH_WHALE);
+        wethInventoryPool.deposit(1_000 * 10**18, addr1);
+
+        vm.prank(poolOwner);
+        wethInventoryPool.borrow(100 * 10**18, addr2, addr2, TEST_TIMESTAMP + 1 days, block.chainid);
+
+        uint preWithdrawAccInterestFactor = wethInventoryPool.accumulatedInterestFactor();
+
+        vm.warp(TEST_TIMESTAMP + 1 hours);
+
+        // Withdraw some funds
+        vm.prank(addr1);
+        wethInventoryPool.withdraw(10 * 10**18, addr1, addr1);
+
+        assertTrue(wethInventoryPool.storedAccInterestFactor() > preWithdrawAccInterestFactor, "Stored interest factor should have increased after withdraw");
+    }
 }
