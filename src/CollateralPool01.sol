@@ -79,7 +79,7 @@ contract CollateralPool01 is ICollateralPool01, Ownable, ReentrancyGuardTransien
         emit WithdrawCompleted(msg.sender, nonce, token, amount);
     }
 
-    function liquidateBalance(address depositor, IERC20 token, uint amount, address recipient) public onlyOwner() {
+    function liquidateBalance(address depositor, IERC20 token, uint amount, address recipient) public nonReentrant() onlyOwner() {
         if(tokenBalance[depositor][token] < amount) {
             revert InsufficientLiquidity(tokenBalance[depositor][token]);
         }
@@ -90,20 +90,21 @@ contract CollateralPool01 is ICollateralPool01, Ownable, ReentrancyGuardTransien
         emit BalanceLiquidated(depositor, token, amount, recipient);
     }
 
-    function liquidateWithdraw(uint nonce, address depositor, uint amount, address recipient) public onlyOwner() {
+    function liquidateWithdraw(uint nonce, address depositor, uint amount, address recipient) public nonReentrant() onlyOwner() {
         TokenWithdraw storage _tokenWithdraw = tokenWithdraws[depositor][nonce];
         if (_tokenWithdraw.amount < amount) {
             revert InsufficientLiquidity(_tokenWithdraw.amount);
         }
 
+        IERC20 token = _tokenWithdraw.token;
         if (_tokenWithdraw.amount == amount) {
             delete tokenWithdraws[depositor][nonce];
         } else {
             _tokenWithdraw.amount -= amount;
         }
-        _tokenWithdraw.token.safeTransfer(recipient, amount);
+        token.safeTransfer(recipient, amount);
 
-        emit WithdrawLiquidated(depositor, nonce, _tokenWithdraw.token, amount, recipient);
+        emit WithdrawLiquidated(depositor, nonce, token, amount, recipient);
     }
 
     function updateWithdrawPeriod(uint _withdrawPeriod) public onlyOwner() {

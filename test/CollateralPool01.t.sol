@@ -161,4 +161,381 @@ contract CollateralPool01Test is Test, Helper {
         collateralPool.deposit(WETH_ERC20, depositAmount);
         vm.stopPrank();
     }
-} 
+
+    // Tests startWithdraw fails with insufficient balance
+    function testCollateralPool01_startWithdraw_insufficientBalance() public {
+        uint depositAmount = 100 * 10**18;
+        uint withdrawAmount = depositAmount + 1;
+
+        vm.startPrank(addr1);
+        WETH_ERC20.approve(address(collateralPool), depositAmount);
+        collateralPool.deposit(WETH_ERC20, depositAmount);
+        
+        vm.expectRevert(abi.encodeWithSelector(InsufficientBalance.selector, depositAmount));
+        collateralPool.startWithdraw(WETH_ERC20, withdrawAmount);
+        vm.stopPrank();
+    }
+
+    // Tests startWithdraw state changes
+    function testCollateralPool01_startWithdraw_state() public {
+        uint depositAmount = 100 * 10**18;
+        uint withdrawAmount = 50 * 10**18;
+
+        // Setup: deposit tokens
+        vm.startPrank(addr1);
+        WETH_ERC20.approve(address(collateralPool), depositAmount);
+        collateralPool.deposit(WETH_ERC20, depositAmount);
+
+        // Start withdraw
+        collateralPool.startWithdraw(WETH_ERC20, withdrawAmount);
+        vm.stopPrank();
+
+        // Check token balance is reduced
+        assertEq(
+            collateralPool.tokenBalance(addr1, WETH_ERC20),
+            depositAmount - withdrawAmount,
+            "Token balance should be reduced by withdraw amount"
+        );
+
+        // Check nonce is incremented
+        assertEq(
+            collateralPool.withdrawNonce(addr1),
+            1,
+            "Withdraw nonce should be incremented"
+        );
+
+        // Check tokenWithdraws state
+        (IERC20 token, uint startTime, uint amount) = collateralPool.tokenWithdraws(addr1, 1);
+        assertEq(address(token), address(WETH_ERC20), "Token address should match");
+        assertEq(startTime, block.timestamp, "Start time should be current block timestamp");
+        assertEq(amount, withdrawAmount, "Withdraw amount should match");
+    }
+
+    // Tests startWithdraw event emission
+    function testCollateralPool01_startWithdraw_event() public {
+        uint depositAmount = 100 * 10**18;
+        uint withdrawAmount = 50 * 10**18;
+
+        // Setup: deposit tokens
+        vm.startPrank(addr1);
+        WETH_ERC20.approve(address(collateralPool), depositAmount);
+        collateralPool.deposit(WETH_ERC20, depositAmount);
+
+        // Expect WithdrawRequested event
+        vm.expectEmit(true, false, false, true, address(collateralPool));
+        emit ICollateralPool01.WithdrawRequested(addr1, 1, block.timestamp, WETH_ERC20, withdrawAmount);
+
+        // Start withdraw
+        collateralPool.startWithdraw(WETH_ERC20, withdrawAmount);
+        vm.stopPrank();
+    }
+
+    // Tests withdraw fails when nothing to withdraw
+    function testCollateralPool01_withdraw_nothingToWithdraw() public {
+        vm.startPrank(addr1);
+        vm.expectRevert(NothingToWithdraw.selector);
+        collateralPool.withdraw(1);
+        vm.stopPrank();
+    }
+
+    // Tests withdraw fails when withdraw period hasn't elapsed
+    function testCollateralPool01_withdraw_notReady() public {
+        uint depositAmount = 100 * 10**18;
+        uint withdrawAmount = 50 * 10**18;
+
+        // Setup: deposit and start withdraw
+        vm.startPrank(addr1);
+        WETH_ERC20.approve(address(collateralPool), depositAmount);
+        collateralPool.deposit(WETH_ERC20, depositAmount);
+        collateralPool.startWithdraw(WETH_ERC20, withdrawAmount);
+
+        uint withdrawReadyTime = block.timestamp + WITHDRAW_PERIOD;
+        vm.expectRevert(abi.encodeWithSelector(WithdrawNotReady.selector, withdrawReadyTime));
+        collateralPool.withdraw(1);
+        vm.stopPrank();
+    }
+
+    // Tests successful withdraw
+    function testCollateralPool01_withdraw_success() public {
+        uint depositAmount = 100 * 10**18;
+        uint withdrawAmount = 50 * 10**18;
+
+        // Setup: deposit and start withdraw
+        vm.startPrank(addr1);
+        WETH_ERC20.approve(address(collateralPool), depositAmount);
+        collateralPool.deposit(WETH_ERC20, depositAmount);
+        collateralPool.startWithdraw(WETH_ERC20, withdrawAmount);
+
+        // Advance time past withdraw period
+        vm.warp(block.timestamp + WITHDRAW_PERIOD + 1);
+
+        uint balanceBefore = WETH_ERC20.balanceOf(addr1);
+        
+        // Perform withdraw
+        collateralPool.withdraw(1);
+        vm.stopPrank();
+
+        // Verify token transfer
+        assertEq(
+            WETH_ERC20.balanceOf(addr1),
+            balanceBefore + withdrawAmount,
+            "Tokens should be transferred to withdrawer"
+        );
+
+        // Verify withdraw request is deleted
+        (IERC20 token, uint startTime, uint amount) = collateralPool.tokenWithdraws(addr1, 1);
+        assertEq(amount, 0, "Withdraw request should be deleted");
+        assertEq(address(token), address(0), "Token should be zero address");
+        assertEq(startTime, 0, "Start time should be zero");
+    }
+
+    // Tests withdraw event emission
+    function testCollateralPool01_withdraw_event() public {
+        uint depositAmount = 100 * 10**18;
+        uint withdrawAmount = 50 * 10**18;
+
+        // Setup: deposit and start withdraw
+        vm.startPrank(addr1);
+        WETH_ERC20.approve(address(collateralPool), depositAmount);
+        collateralPool.deposit(WETH_ERC20, depositAmount);
+        collateralPool.startWithdraw(WETH_ERC20, withdrawAmount);
+
+        // Advance time past withdraw period
+        vm.warp(block.timestamp + WITHDRAW_PERIOD + 1);
+
+        // Expect WithdrawCompleted event
+        vm.expectEmit(true, false, false, true, address(collateralPool));
+        emit ICollateralPool01.WithdrawCompleted(addr1, 1, WETH_ERC20, withdrawAmount);
+
+        // Perform withdraw
+        collateralPool.withdraw(1);
+        vm.stopPrank();
+    }
+
+    // Tests multiple withdraws at different times
+    function testCollateralPool01_withdraw_multiple() public {
+        uint depositAmount = 100 * 10**18;
+        uint firstWithdrawAmount = 30 * 10**18;
+        uint secondWithdrawAmount = 40 * 10**18;
+
+        // Setup: deposit tokens
+        vm.startPrank(addr1);
+        WETH_ERC20.approve(address(collateralPool), depositAmount);
+        collateralPool.deposit(WETH_ERC20, depositAmount);
+
+        // Start first withdraw
+        collateralPool.startWithdraw(WETH_ERC20, firstWithdrawAmount);
+        
+        // Move forward 12 hours and start second withdraw
+        vm.warp(block.timestamp + 12 hours);
+        collateralPool.startWithdraw(WETH_ERC20, secondWithdrawAmount);
+
+        // Verify both withdraws are stored correctly
+        (IERC20 token1, uint startTime1, uint amount1) = collateralPool.tokenWithdraws(addr1, 1);
+        (IERC20 token2, uint startTime2, uint amount2) = collateralPool.tokenWithdraws(addr1, 2);
+        
+        assertEq(amount1, firstWithdrawAmount, "First withdraw amount should be correct");
+        assertEq(amount2, secondWithdrawAmount, "Second withdraw amount should be correct");
+        assertEq(startTime2 - startTime1, 12 hours, "Withdraw times should be 12 hours apart");
+
+        // Move forward past withdraw period for both withdraws
+        vm.warp(block.timestamp + WITHDRAW_PERIOD);
+
+        uint balanceBefore = WETH_ERC20.balanceOf(addr1);
+
+        // Withdraw both
+        collateralPool.withdraw(1);
+        collateralPool.withdraw(2);
+        vm.stopPrank();
+
+        // Verify both withdraws were successful
+        assertEq(
+            WETH_ERC20.balanceOf(addr1),
+            balanceBefore + firstWithdrawAmount + secondWithdrawAmount,
+            "Both withdraws should be transferred"
+        );
+
+        // Verify both withdraw requests are deleted
+        (token1, startTime1, amount1) = collateralPool.tokenWithdraws(addr1, 1);
+        (token2, startTime2, amount2) = collateralPool.tokenWithdraws(addr1, 2);
+        
+        // Verify first withdraw is completely deleted
+        assertEq(amount1, 0, "First withdraw amount should be deleted");
+        assertEq(address(token1), address(0), "First withdraw token should be deleted");
+        assertEq(startTime1, 0, "First withdraw start time should be deleted");
+
+        // Verify second withdraw is completely deleted
+        assertEq(amount2, 0, "Second withdraw amount should be deleted");
+        assertEq(address(token2), address(0), "Second withdraw token should be deleted");
+        assertEq(startTime2, 0, "Second withdraw start time should be deleted");
+
+        assertEq(
+            collateralPool.tokenBalance(addr1, WETH_ERC20),
+            depositAmount - firstWithdrawAmount - secondWithdrawAmount,
+            "Final balance should reflect both withdraws"
+        );
+    }
+
+    // Tests liquidateBalance fails with insufficient balance
+    function testCollateralPool01_liquidateBalance_insufficientLiquidity() public {
+        uint depositAmount = 100 * 10**18;
+        uint liquidateAmount = depositAmount + 1;
+
+        // Setup: deposit tokens
+        vm.startPrank(addr1);
+        WETH_ERC20.approve(address(collateralPool), depositAmount);
+        collateralPool.deposit(WETH_ERC20, depositAmount);
+        vm.stopPrank();
+
+        // Try to liquidate more than available
+        vm.prank(owner);
+        vm.expectRevert(abi.encodeWithSelector(InsufficientLiquidity.selector, depositAmount));
+        collateralPool.liquidateBalance(addr1, WETH_ERC20, liquidateAmount, addr2);
+    }
+
+    // Tests successful liquidateBalance
+    function testCollateralPool01_liquidateBalance_success() public {
+        uint depositAmount = 100 * 10**18;
+        uint liquidateAmount = 50 * 10**18;
+
+        // Setup: deposit tokens
+        vm.startPrank(addr1);
+        WETH_ERC20.approve(address(collateralPool), depositAmount);
+        collateralPool.deposit(WETH_ERC20, depositAmount);
+        vm.stopPrank();
+
+        uint recipientBalanceBefore = WETH_ERC20.balanceOf(addr2);
+
+        // Liquidate balance
+        vm.prank(owner);
+        collateralPool.liquidateBalance(addr1, WETH_ERC20, liquidateAmount, addr2);
+
+        // Verify token transfer
+        assertEq(
+            WETH_ERC20.balanceOf(addr2),
+            recipientBalanceBefore + liquidateAmount,
+            "Tokens should be transferred to recipient"
+        );
+
+        // Verify depositor balance is reduced
+        assertEq(
+            collateralPool.tokenBalance(addr1, WETH_ERC20),
+            depositAmount - liquidateAmount,
+            "Depositor balance should be reduced by liquidated amount"
+        );
+    }
+
+    // Tests liquidateBalance event emission
+    function testCollateralPool01_liquidateBalance_event() public {
+        uint depositAmount = 100 * 10**18;
+        uint liquidateAmount = 50 * 10**18;
+
+        // Setup: deposit tokens
+        vm.startPrank(addr1);
+        WETH_ERC20.approve(address(collateralPool), depositAmount);
+        collateralPool.deposit(WETH_ERC20, depositAmount);
+        vm.stopPrank();
+
+        // Expect BalanceLiquidated event
+        vm.expectEmit(true, false, false, true, address(collateralPool));
+        emit ICollateralPool01.BalanceLiquidated(addr1, WETH_ERC20, liquidateAmount, addr2);
+
+        // Liquidate balance
+        vm.prank(owner);
+        collateralPool.liquidateBalance(addr1, WETH_ERC20, liquidateAmount, addr2);
+    }
+
+    // Tests liquidateWithdraw fails with insufficient amount
+    function testCollateralPool01_liquidateWithdraw_insufficientLiquidity() public {
+        uint depositAmount = 100 * 10**18;
+        uint withdrawAmount = 50 * 10**18;
+        uint liquidateAmount = withdrawAmount + 1;
+
+        // Setup: deposit and start withdraw
+        vm.startPrank(addr1);
+        WETH_ERC20.approve(address(collateralPool), depositAmount);
+        collateralPool.deposit(WETH_ERC20, depositAmount);
+        collateralPool.startWithdraw(WETH_ERC20, withdrawAmount);
+        vm.stopPrank();
+
+        // Try to liquidate more than withdraw amount
+        vm.prank(owner);
+        vm.expectRevert(abi.encodeWithSelector(InsufficientLiquidity.selector, withdrawAmount));
+        collateralPool.liquidateWithdraw(1, addr1, liquidateAmount, addr2);
+    }
+
+    // Tests full liquidation of withdraw request
+    function testCollateralPool01_liquidateWithdraw_full() public {
+        uint depositAmount = 100 * 10**18;
+        uint withdrawAmount = 50 * 10**18;
+
+        // Setup: deposit and start withdraw
+        vm.startPrank(addr1);
+        WETH_ERC20.approve(address(collateralPool), depositAmount);
+        collateralPool.deposit(WETH_ERC20, depositAmount);
+        collateralPool.startWithdraw(WETH_ERC20, withdrawAmount);
+        vm.stopPrank();
+
+        uint recipientBalanceBefore = WETH_ERC20.balanceOf(addr2);
+
+        // Expect WithdrawLiquidated event
+        vm.expectEmit(true, false, false, true, address(collateralPool));
+        emit ICollateralPool01.WithdrawLiquidated(addr1, 1, WETH_ERC20, withdrawAmount, addr2);
+
+        // Liquidate full withdraw
+        vm.prank(owner);
+        collateralPool.liquidateWithdraw(1, addr1, withdrawAmount, addr2);
+
+        // Verify token transfer
+        assertEq(
+            WETH_ERC20.balanceOf(addr2),
+            recipientBalanceBefore + withdrawAmount,
+            "Tokens should be transferred to recipient"
+        );
+
+        // Verify withdraw request is completely deleted
+        (IERC20 token, uint startTime, uint amount) = collateralPool.tokenWithdraws(addr1, 1);
+        assertEq(amount, 0, "Withdraw amount should be deleted");
+        assertEq(address(token), address(0), "Token should be deleted");
+        assertEq(startTime, 0, "Start time should be deleted");
+    }
+
+    // Tests partial liquidation of withdraw request
+    function testCollateralPool01_liquidateWithdraw_partial() public {
+        uint depositAmount = 100 * 10**18;
+        uint withdrawAmount = 50 * 10**18;
+        uint liquidateAmount = 30 * 10**18;
+
+        // Setup: deposit and start withdraw
+        vm.startPrank(addr1);
+        WETH_ERC20.approve(address(collateralPool), depositAmount);
+        collateralPool.deposit(WETH_ERC20, depositAmount);
+        collateralPool.startWithdraw(WETH_ERC20, withdrawAmount);
+        vm.stopPrank();
+
+        // Store initial withdraw state
+        (IERC20 initialToken, uint initialStartTime,) = collateralPool.tokenWithdraws(addr1, 1);
+        uint recipientBalanceBefore = WETH_ERC20.balanceOf(addr2);
+
+        // Expect WithdrawLiquidated event
+        vm.expectEmit(true, false, false, true, address(collateralPool));
+        emit ICollateralPool01.WithdrawLiquidated(addr1, 1, WETH_ERC20, liquidateAmount, addr2);
+
+        // Liquidate partial withdraw
+        vm.prank(owner);
+        collateralPool.liquidateWithdraw(1, addr1, liquidateAmount, addr2);
+
+        // Verify token transfer
+        assertEq(
+            WETH_ERC20.balanceOf(addr2),
+            recipientBalanceBefore + liquidateAmount,
+            "Tokens should be transferred to recipient"
+        );
+
+        // Verify withdraw request is partially reduced
+        (IERC20 token, uint startTime, uint amount) = collateralPool.tokenWithdraws(addr1, 1);
+        assertEq(amount, withdrawAmount - liquidateAmount, "Withdraw amount should be reduced");
+        assertEq(address(token), address(initialToken), "Token should remain unchanged");
+        assertEq(startTime, initialStartTime, "Start time should remain unchanged");
+    }
+}
