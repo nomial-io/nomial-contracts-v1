@@ -418,4 +418,38 @@ contract InventoryPool01Test is Test, Helper {
         uint poolFinalBalance = IERC20(WETH).balanceOf(address(wethInventoryPool));
         assertEq(poolFinalBalance - poolInitialBalance, totalPayment, "Pool should receive the total payment amount");
     }
+
+    function testInventoryPool01_repay_baseDebtOverpayment() public {
+        vm.warp(TEST_TIMESTAMP);
+
+        vm.startPrank(WETH_WHALE);
+        wethInventoryPool.deposit(1_000 * 10**18, poolOwner);
+        WETH_ERC20.transfer(addr1, 1 * 10**18);
+        vm.stopPrank();
+        
+        vm.prank(poolOwner);
+        wethInventoryPool.borrow(100 * 10**18, addr1, addr1, TEST_TIMESTAMP + 1 days, block.chainid);
+
+        uint baseDebt = wethInventoryPool.baseDebt(addr1);
+        uint overpaymentAmount = baseDebt * 2;
+
+        uint poolInitialBalance = IERC20(WETH).balanceOf(address(wethInventoryPool));
+
+        vm.startPrank(addr1);
+        WETH_ERC20.approve(address(wethInventoryPool), overpaymentAmount);
+
+        vm.expectEmit(true, false, false, true, address(wethInventoryPool));
+        emit IInventoryPool01.BaseDebtRepayment(addr1, baseDebt, baseDebt);
+        
+        wethInventoryPool.repay(overpaymentAmount, addr1);
+        vm.stopPrank();
+
+        assertEq(wethInventoryPool.baseDebt(addr1), 0, "Base debt should be cleared");
+
+        (,uint penaltyCounterStart,) = wethInventoryPool.borrowers(addr1);
+        assertEq(penaltyCounterStart, 0, "Penalty counter should be reset");
+
+        uint poolFinalBalance = IERC20(WETH).balanceOf(address(wethInventoryPool));
+        assertEq(poolFinalBalance - poolInitialBalance, baseDebt, "Pool should receive only the actual debt amount");
+    }
 }
