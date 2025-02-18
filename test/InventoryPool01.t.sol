@@ -482,7 +482,6 @@ contract InventoryPool01Test is Test, Helper {
 
         vm.warp(TEST_TIMESTAMP + 1 hours);
 
-        // Withdraw some funds
         vm.prank(addr1);
         wethInventoryPool.withdraw(10 * 10**18, addr1, addr1);
 
