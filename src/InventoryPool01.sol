@@ -6,6 +6,7 @@ import {ERC4626, IERC20, ERC20} from "@openzeppelin/contracts/token/ERC20/extens
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IInventoryPool01} from "./interfaces/IInventoryPool01.sol";
 import {IInventoryPoolParams01} from "./interfaces/IInventoryPoolParams01.sol";
 
@@ -28,6 +29,7 @@ struct BorrowerData {
  */
 contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardTransient {
     using Math for uint256;
+    using SafeERC20 for IERC20;
 
     IInventoryPoolParams01 public params;
     uint public storedAccInterestFactor;
@@ -67,7 +69,7 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
             borrowers[borrower].penaltyCounterStart = block.timestamp;
         }
 
-        IERC20(asset()).transfer(recipient, amount);
+        IERC20(asset()).safeTransfer(recipient, amount);
 
         emit Borrowed(borrower, recipient, amount);
     }
@@ -118,7 +120,7 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
             emit BaseDebtRepayment(borrower, baseDebt_, baseDebtPayment_);
         }
 
-        IERC20(asset()).transferFrom(msg.sender, address(this), baseDebtPayment_ + penaltyPayment_);
+        IERC20(asset()).safeTransferFrom(msg.sender, address(this), baseDebtPayment_ + penaltyPayment_);
     }
 
     function absolvePenalty (address borrower) public onlyOwner() {
