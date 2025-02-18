@@ -177,6 +177,17 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
             );
         }
     }
+    
+    function _deposit(
+        address caller,
+        address receiver,
+        uint256 assets,
+        uint256 shares
+    ) internal override {
+        ERC4626._deposit(caller, receiver, assets, shares);
+
+        _updateAccumulatedInterestFactor();
+    }
 
     function _withdraw(
         address caller,
@@ -189,6 +200,8 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
             revert InsufficientLiquidity();
         }
         ERC4626._withdraw(caller, receiver, owner, assets, shares);
+
+        _updateAccumulatedInterestFactor();
     }
 
     function _updateAccumulatedInterestFactor () internal {
