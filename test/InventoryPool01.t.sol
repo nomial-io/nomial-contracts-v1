@@ -4,15 +4,20 @@ pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
 import {console} from "forge-std/console.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import "../src/InventoryPool01.sol";
-import "../src/InventoryPoolDeployer01.sol";
+import "../src/deployment/InventoryPoolDeployer01.sol";
+import "../src/deployment/InventoryPoolParamsDeployer01.sol";
+import "../src/deployment/NomialDeployer01.sol";
 import {InvalidUtilizationRate} from "../src/interfaces/IInventoryPoolParams01.sol";
 import "./Helper.sol";
 
 contract InventoryPool01Test is Test, Helper {
     using Math for uint256;
 
-    InventoryPoolDeployer01 public inventoryPoolDeployer01;
+    InventoryPoolDeployer01 public poolDeployer;
+    InventoryPoolParamsDeployer01 public paramsDeployer;
+    NomialDeployer01 public nomialDeployer;
     InventoryPool01 public usdcInventoryPool;
     InventoryPool01 public wethInventoryPool;
     
@@ -25,30 +30,45 @@ contract InventoryPool01Test is Test, Helper {
     bytes32 public constant salt3 = hex'ed0461bb6636b9669060a1f83779bb5d660330b2a2cd0d04dd3c22533b24aae3';
     bytes32 public constant salt4 = hex'3b9eaf8ca13209dab364d64ca37e15568026112dda9f5dd8d3519338ae882fd7';
 
-    function setUp () public {
+    function setUp() public {
         setupAll();
-        inventoryPoolDeployer01 = new InventoryPoolDeployer01();
+        
+        // Deploy the deployers
+        poolDeployer = new InventoryPoolDeployer01();
+        paramsDeployer = new InventoryPoolParamsDeployer01();
+        nomialDeployer = new NomialDeployer01(
+            address(poolDeployer),
+            address(paramsDeployer)
+        );
 
+        // Deploy USDC pool
         vm.startPrank(USDC_WHALE);
-        USDC_ERC20.approve(address(inventoryPoolDeployer01), MAX_UINT);
-        (address payable usdcPoolAddress,) = inventoryPoolDeployer01.deploy(
+        USDC_ERC20.approve(address(poolDeployer), MAX_UINT);
+        (address payable usdcPoolAddress,) = nomialDeployer.deploy(
             salt1,
-            IERC20(USDC), "nomialUSDC", "nmlUSDC",
+            IERC20(USDC),
+            "nomialUSDC",
+            "nmlUSDC",
             1 * 10**5,
             poolOwner,
-            abi.encode(defaultBaseFee, defaultBaseRate, defaultRate1, defaultRate2, defaultOptimalUtilizationRate, defaultPenaltyRate, defaultPenaltyPeriod)
+            abi.encode(defaultBaseFee, defaultBaseRate, defaultRate1, defaultRate2, defaultOptimalUtilizationRate, defaultPenaltyRate, defaultPenaltyPeriod),
+            USDC_WHALE
         );
         usdcInventoryPool = InventoryPool01(usdcPoolAddress);
         vm.stopPrank();
     
+        // Deploy WETH pool
         vm.startPrank(WETH_WHALE);
-        WETH_ERC20.approve(address(inventoryPoolDeployer01), MAX_UINT);
-        (address payable wethPoolAddress,) = inventoryPoolDeployer01.deploy(
+        WETH_ERC20.approve(address(poolDeployer), MAX_UINT);
+        (address payable wethPoolAddress,) = nomialDeployer.deploy(
             salt2,
-            IERC20(WETH), "nomialWETH", "nmlWETH",
+            IERC20(WETH),
+            "nomialWETH",
+            "nmlWETH",
             1 * 10**14,
             poolOwner,
-            abi.encode(defaultBaseFee, defaultBaseRate, defaultRate1, defaultRate2, defaultOptimalUtilizationRate, defaultPenaltyRate, defaultPenaltyPeriod)
+            abi.encode(defaultBaseFee, defaultBaseRate, defaultRate1, defaultRate2, defaultOptimalUtilizationRate, defaultPenaltyRate, defaultPenaltyPeriod),
+            WETH_WHALE
         );
         wethInventoryPool = InventoryPool01(wethPoolAddress);
         vm.stopPrank();
