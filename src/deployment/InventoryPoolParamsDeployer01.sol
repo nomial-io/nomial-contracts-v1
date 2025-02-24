@@ -3,14 +3,15 @@ pragma solidity ^0.8.20;
 
 import {InventoryPoolParams01} from "../InventoryPoolParams01.sol";
 import {IInventoryPoolParamsDeployer01} from "./interfaces/IInventoryPoolParamsDeployer01.sol";
+import {DeployerLib} from "./DeployerLib.sol";
 
 contract InventoryPoolParamsDeployer01 is IInventoryPoolParamsDeployer01 {
 
-    function deployParams(
+    function deployParamsAddress(
         bytes32 salt,
         address owner,
         bytes calldata paramsInitData
-    ) public returns (address payable paramsAddress_) {
+    ) public view returns (address payable addr, bytes memory bytecode) {
         (
             uint baseFee,
             uint baseRate,
@@ -20,18 +21,32 @@ contract InventoryPoolParamsDeployer01 is IInventoryPoolParamsDeployer01 {
             uint penaltyRate,
             uint penaltyPeriod
         ) = abi.decode(paramsInitData, (uint, uint, uint, uint, uint, uint, uint));
-    
-        bytes memory paramsBytecode = type(InventoryPoolParams01).creationCode;
-        paramsBytecode = abi.encodePacked(paramsBytecode, abi.encode(
-            owner, baseFee, baseRate, rate1, rate2, 
-            optimalUtilizationRate, penaltyRate, penaltyPeriod
-        ));
+
+        bytecode = abi.encodePacked(
+            type(InventoryPoolParams01).creationCode,
+            abi.encode(
+                owner, baseFee, baseRate, rate1, rate2, 
+                optimalUtilizationRate, penaltyRate, penaltyPeriod
+            )
+        );
+
+        addr = payable(DeployerLib.addressFromBytecode(address(this), salt, bytecode));
+    }
+
+    function deployParams(
+        bytes32 salt,
+        address owner,
+        bytes calldata paramsInitData
+    ) public returns (address payable paramsAddress_) {
+        (address payable expectedAddr, bytes memory bytecode) = deployParamsAddress(salt, owner, paramsInitData);
 
         assembly {
-            paramsAddress_ := create2(0, add(paramsBytecode, 0x20), mload(paramsBytecode), salt)
+            paramsAddress_ := create2(0, add(bytecode, 0x20), mload(bytecode), salt)
         }
 
         if (paramsAddress_ == address(0)) revert FailedToDeployInventoryPoolParams();
+        require(paramsAddress_ == expectedAddr, "Deployed address mismatch");
+        
         emit InventoryPoolParamsDeployed(paramsAddress_);
     }
 } 

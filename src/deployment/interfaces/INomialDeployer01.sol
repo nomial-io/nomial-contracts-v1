@@ -21,4 +21,14 @@ interface INomialDeployer01 {
         bytes calldata paramsInitData,
         address poolFunder
     ) external returns (address payable pool, address payable params);
+
+    function deployAddresses(
+        bytes32 salt,
+        IERC20 asset,
+        string calldata name,
+        string calldata symbol,
+        uint initAmount,
+        address owner,
+        bytes calldata paramsInitData
+    ) external view returns (address payable pool, address payable params);
 }

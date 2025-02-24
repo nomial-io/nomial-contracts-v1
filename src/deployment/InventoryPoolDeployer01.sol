@@ -9,6 +9,23 @@ import {IInventoryPoolDeployer01} from "./interfaces/IInventoryPoolDeployer01.so
 
 contract InventoryPoolDeployer01 is IInventoryPoolDeployer01 {
 
+    function deployPoolAddress(
+        bytes32 salt,
+        IERC20 asset,
+        string calldata name,
+        string calldata symbol,
+        uint initAmount,
+        address owner,
+        address paramsAddr
+    ) public view returns (address payable addr, bytes memory bytecode) {
+        bytecode = abi.encodePacked(
+            type(InventoryPool01).creationCode,
+            abi.encode(asset, name, symbol, initAmount, owner, paramsAddr)
+        );
+
+        addr = payable(DeployerLib.addressFromBytecode(address(this), salt, bytecode));
+    }
+
     function deployPool(
         bytes32 salt,
         IERC20 asset,
@@ -19,23 +36,20 @@ contract InventoryPoolDeployer01 is IInventoryPoolDeployer01 {
         address paramsAddr,
         address poolFunder
     ) public returns (address payable poolAddress_) {
-        bytes memory poolBytecode = type(InventoryPool01).creationCode;
-        poolBytecode = abi.encodePacked(poolBytecode, abi.encode(
-            asset, name, symbol, initAmount, owner, paramsAddr
-        ));
-        
-        address computedPoolAddress = DeployerLib.addressFromBytecode(
-            address(this), salt, poolBytecode
+        (address payable expectedAddr, bytes memory bytecode) = deployPoolAddress(
+            salt, asset, name, symbol, initAmount, owner, paramsAddr
         );
-        
+
         SafeERC20.safeTransferFrom(asset, poolFunder, address(this), initAmount);
-        asset.approve(computedPoolAddress, initAmount);
+        asset.approve(expectedAddr, initAmount);
 
         assembly {
-            poolAddress_ := create2(0, add(poolBytecode, 0x20), mload(poolBytecode), salt)
+            poolAddress_ := create2(0, add(bytecode, 0x20), mload(bytecode), salt)
         }
 
         if (poolAddress_ == address(0)) revert FailedToDeployPool();
+        require(poolAddress_ == expectedAddr, "Deployed address mismatch");
+
         emit PoolDeployed(poolAddress_);
     }
-} 
+}

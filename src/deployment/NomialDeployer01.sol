@@ -42,4 +42,32 @@ contract NomialDeployer01 is INomialDeployer01 {
             poolFunder
         );
     }
+
+    function deployAddresses(
+        bytes32 salt,
+        IERC20 asset,
+        string calldata name,
+        string calldata symbol,
+        uint initAmount,
+        address owner,
+        bytes calldata paramsInitData
+    ) public view returns (address payable pool, address payable params) {
+        // Get params address first since it's needed for pool deployment
+        (params,) = paramsDeployer.deployParamsAddress(
+            salt,
+            owner,
+            paramsInitData
+        );
+
+        // Get pool address using params address
+        (pool,) = poolDeployer.deployPoolAddress(
+            salt,
+            asset,
+            name,
+            symbol,
+            initAmount,
+            owner,
+            params
+        );
+    }
 }
