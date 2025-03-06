@@ -52,6 +52,12 @@ The protocol uses a two-slope interest rate model similar to Aave v3 to determin
 
 ## Development
 
+### Build
+```bash
+yarn install
+forge build
+```
+
 ### Testing
 ```bash
 forge test
