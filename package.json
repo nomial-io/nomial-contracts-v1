@@ -1,11 +1,11 @@
 {
-  "name": "@nomial-io/nomial-contracts",
+  "name": "@nomial-io/nomial-contracts-v1",
   "version": "1.0.0",
   "scripts": {
     "build": "forge build",
     "test": "forge test"
   },
-  "description": "Brink intents smart contracts",
+  "description": "Nomial V1 smart contracts",
   "author": "@mikec",
   "license": "GPL-3.0-or-later",
   "repository": {
