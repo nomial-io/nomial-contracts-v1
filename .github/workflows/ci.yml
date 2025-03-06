@@ -11,6 +11,14 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Install Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install Dependencies
+        run: yarn install
+
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
         with:
