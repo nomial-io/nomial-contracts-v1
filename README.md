@@ -1,3 +1,5 @@
+[![Tests](https://github.com/nomial-io/nomial-contracts-v1/actions/workflows/ci.yml/badge.svg)](https://github.com/nomial-io/nomial-contracts-v1/actions/workflows/ci.yml)
+
 # Nomial Contracts v1
 
 Nomial V1 is a protocol for cross-chain inventory access, designed for intent solvers. It allows solvers to deposit ERC20 tokens as collateral on Arbitrum One and borrow against this collateral on multiple chains.
