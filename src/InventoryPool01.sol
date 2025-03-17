@@ -21,7 +21,7 @@ import {IInventoryPoolParams01} from "./interfaces/IInventoryPoolParams01.sol";
 struct BorrowerData {
     uint scaledDebt;
     uint penaltyCounterStart;
-    uint penaltyDebtPaid;
+    uint partialPenaltyPayment;
 }
 
 /**
@@ -232,21 +232,30 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
             revert NoDebt();
         }
 
-        uint baseDebtPayment_ = amount;
+        uint baseDebtPayment_;
 
         uint penaltyDebt_ = _penaltyDebt(borrower, storedAccInterestFactor);
         uint penaltyPayment_ = 0;
         if (penaltyDebt_ > 0) {
-            if (baseDebtPayment_ > penaltyDebt_) {
-                baseDebtPayment_ -= penaltyDebt_;
+            if (amount > penaltyDebt_) {
+                // payment amount is greater than penalty debt.
+                // after penalty debt is paid, the remaining amount goes to base debt payment
+                baseDebtPayment_ = amount - penaltyDebt_;
+                // set penalty payment to full penalty debt amount
                 penaltyPayment_ = penaltyDebt_;
-                borrowers[borrower].penaltyDebtPaid = 0;
+                // reset partial penalty payment
+                borrowers[borrower].partialPenaltyPayment = 0;
             } else {
-                borrowers[borrower].penaltyDebtPaid += amount;
+                // payment amount is less than penalty debt.
+                // store partial payment amount.
+                // this will be used to calculate the remaining penalty debt.
+                borrowers[borrower].partialPenaltyPayment += amount;
                 penaltyPayment_ = amount;
-                baseDebtPayment_ = 0;
             }
             emit PenaltyRepayment(borrower, penaltyDebt_, penaltyPayment_);
+        } else {
+            // no penalty debt, full payment amount is used to pay base debt
+            baseDebtPayment_ = amount;
         }
         
         if (baseDebtPayment_ > 0) {
@@ -371,7 +380,7 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
         uint penaltyTime_ = penaltyTime(borrower);
         if (penaltyTime_ == 0) return 0;
 
-        return (_baseDebt(borrower, accInterestFactor) * penaltyTime_).mulDiv(params.penaltyRate(), 1e27) - borrowers[borrower].penaltyDebtPaid;
+        return (_baseDebt(borrower, accInterestFactor) * penaltyTime_).mulDiv(params.penaltyRate(), 1e27) - borrowers[borrower].partialPenaltyPayment;
     }
 
     /**
