@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-import {IInventoryPoolParams01, InvalidUtilizationRate} from "./interfaces/IInventoryPoolParams01.sol";
+import {IInventoryPoolParams01} from "./interfaces/IInventoryPoolParams01.sol";
 
 /**
  * @title InventoryPoolParams01

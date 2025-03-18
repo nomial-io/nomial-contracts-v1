@@ -3,7 +3,8 @@ pragma solidity ^0.8.0;
 
 import {Test} from "forge-std/Test.sol";
 import {console} from "forge-std/console.sol";
-import "../src/CollateralPool01.sol";
+import {CollateralPool01} from "../src/CollateralPool01.sol";
+import {ICollateralPool01} from "../src/interfaces/ICollateralPool01.sol";
 import "./Helper.sol";
 
 contract CollateralPool01Test is Test, Helper {
@@ -170,7 +171,7 @@ contract CollateralPool01Test is Test, Helper {
         WETH_ERC20.approve(address(collateralPool), depositAmount);
         collateralPool.deposit(WETH_ERC20, depositAmount);
         
-        vm.expectRevert(abi.encodeWithSelector(InsufficientBalance.selector, depositAmount));
+        vm.expectRevert(abi.encodeWithSelector(ICollateralPool01.InsufficientBalance.selector, depositAmount));
         collateralPool.startWithdraw(WETH_ERC20, withdrawAmount);
         vm.stopPrank();
     }
@@ -239,7 +240,7 @@ contract CollateralPool01Test is Test, Helper {
         collateralPool.deposit(WETH_ERC20, depositAmount);
 
         // Expect WithdrawAmountZero error
-        vm.expectRevert(abi.encodeWithSelector(WithdrawAmountZero.selector));
+        vm.expectRevert(abi.encodeWithSelector(ICollateralPool01.WithdrawAmountZero.selector));
         collateralPool.startWithdraw(WETH_ERC20, 0);
         vm.stopPrank();
     }
@@ -247,7 +248,7 @@ contract CollateralPool01Test is Test, Helper {
     // Tests withdraw fails when nothing to withdraw
     function testCollateralPool01_withdraw_nothingToWithdraw() public {
         vm.startPrank(addr1);
-        vm.expectRevert(NothingToWithdraw.selector);
+        vm.expectRevert(ICollateralPool01.NothingToWithdraw.selector);
         collateralPool.withdraw(1);
         vm.stopPrank();
     }
@@ -264,7 +265,7 @@ contract CollateralPool01Test is Test, Helper {
         collateralPool.startWithdraw(WETH_ERC20, withdrawAmount);
 
         uint withdrawReadyTime = block.timestamp + WITHDRAW_PERIOD;
-        vm.expectRevert(abi.encodeWithSelector(WithdrawNotReady.selector, withdrawReadyTime));
+        vm.expectRevert(abi.encodeWithSelector(ICollateralPool01.WithdrawNotReady.selector, withdrawReadyTime));
         collateralPool.withdraw(1);
         vm.stopPrank();
     }
@@ -403,7 +404,7 @@ contract CollateralPool01Test is Test, Helper {
 
         // Try to liquidate more than available
         vm.prank(owner);
-        vm.expectRevert(abi.encodeWithSelector(InsufficientLiquidity.selector, depositAmount));
+        vm.expectRevert(abi.encodeWithSelector(ICollateralPool01.InsufficientLiquidity.selector, depositAmount));
         collateralPool.liquidateBalance(addr1, WETH_ERC20, liquidateAmount, addr2);
     }
 
@@ -474,7 +475,7 @@ contract CollateralPool01Test is Test, Helper {
 
         // Try to liquidate more than withdraw amount
         vm.prank(owner);
-        vm.expectRevert(abi.encodeWithSelector(InsufficientLiquidity.selector, withdrawAmount));
+        vm.expectRevert(abi.encodeWithSelector(ICollateralPool01.InsufficientLiquidity.selector, withdrawAmount));
         collateralPool.liquidateWithdraw(1, addr1, liquidateAmount, addr2);
     }
 
@@ -575,7 +576,7 @@ contract CollateralPool01Test is Test, Helper {
 
     // Tests that sending ETH to the contract reverts
     function testCollateralPool01_receive() public {
-        vm.expectRevert(NotSupported.selector);
+        vm.expectRevert(ICollateralPool01.NotSupported.selector);
         address(collateralPool).call{value: 1 ether}("");
     }
 }

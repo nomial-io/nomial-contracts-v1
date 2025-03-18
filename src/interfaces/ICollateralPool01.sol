@@ -3,13 +3,6 @@ pragma solidity ^0.8.0;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-error InsufficientBalance(uint balance);
-error NothingToWithdraw();
-error WithdrawNotReady(uint withdrawReadyTime);
-error WithdrawAmountZero();
-error InsufficientLiquidity(uint amount);
-error NotSupported();
-
 interface ICollateralPool01 {
     event Deposited(address indexed depositor, IERC20 token, uint amount);
     event WithdrawRequested(address indexed depositor, uint nonce, uint startTime, IERC20 token, uint amount);
@@ -17,6 +10,13 @@ interface ICollateralPool01 {
     event WithdrawPeriodUpdated(uint withdrawPeriod);
     event BalanceLiquidated(address indexed depositor, IERC20 token, uint amount, address recipient);
     event WithdrawLiquidated(address indexed depositor, uint nonce, IERC20 token, uint amount, address recipient);
+
+    error InsufficientBalance(uint balance);
+    error NothingToWithdraw();
+    error WithdrawNotReady(uint withdrawReadyTime);
+    error WithdrawAmountZero();
+    error InsufficientLiquidity(uint amount);
+    error NotSupported();
 
     function deposit(IERC20 token, uint amount) external;
     function startWithdraw(IERC20 token, uint amount) external;

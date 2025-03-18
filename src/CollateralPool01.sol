@@ -5,15 +5,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
-import {
-    ICollateralPool01,
-    InsufficientBalance,
-    NothingToWithdraw,
-    WithdrawAmountZero,
-    WithdrawNotReady,
-    InsufficientLiquidity,
-    NotSupported
-} from "./interfaces/ICollateralPool01.sol";
+import {ICollateralPool01} from "./interfaces/ICollateralPool01.sol";
 
 struct TokenWithdraw {
     IERC20 token;

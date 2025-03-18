@@ -3,7 +3,8 @@ pragma solidity ^0.8.0;
 
 import {Test} from "forge-std/Test.sol";
 import {console} from "forge-std/console.sol";
-import "../src/InventoryPoolParams01.sol";
+import {InventoryPoolParams01} from "../src/InventoryPoolParams01.sol";
+import {IInventoryPoolParams01} from "../src/interfaces/IInventoryPoolParams01.sol";
 import "./Helper.sol";
 
 contract InventoryPoolParams01Test is Test, Helper {
@@ -82,7 +83,7 @@ contract InventoryPoolParams01Test is Test, Helper {
 
     // Tests interest rate reverts when utilization exceeds max
     function testInventoryPoolParams01_interestRate_exceedsMaxUtilization() public {
-        vm.expectRevert(InvalidUtilizationRate.selector);
+        vm.expectRevert(IInventoryPoolParams01.InvalidUtilizationRate.selector);
         params.interestRate(1e27 + 1);
     }
 

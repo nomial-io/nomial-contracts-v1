@@ -5,10 +5,11 @@ import {Test} from "forge-std/Test.sol";
 import {console} from "forge-std/console.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import "../src/InventoryPool01.sol";
+import {IInventoryPool01} from "../src/interfaces/IInventoryPool01.sol";
+import {IInventoryPoolParams01} from "../src/interfaces/IInventoryPoolParams01.sol";
 import "../src/deployment/InventoryPoolDeployer01.sol";
 import "../src/deployment/InventoryPoolParamsDeployer01.sol";
 import "../src/deployment/NomialDeployer01.sol";
-import {InvalidUtilizationRate} from "../src/interfaces/IInventoryPoolParams01.sol";
 import "./Helper.sol";
 
 contract InventoryPool01Test is Test, Helper {
@@ -83,7 +84,7 @@ contract InventoryPool01Test is Test, Helper {
 
         vm.warp(TEST_TIMESTAMP);
         vm.prank(poolOwner);
-        vm.expectRevert(WrongChainId.selector);
+        vm.expectRevert(IInventoryPool01.WrongChainId.selector);
         wethInventoryPool.borrow(1*10**18, addr1, addr2, TEST_TIMESTAMP + 1 days, block.chainid + 1);
     }
 
@@ -94,7 +95,7 @@ contract InventoryPool01Test is Test, Helper {
 
         vm.warp(TEST_TIMESTAMP);
         vm.prank(poolOwner);
-        vm.expectRevert(Expired.selector);
+        vm.expectRevert(IInventoryPool01.Expired.selector);
         wethInventoryPool.borrow(1*10**18, addr1, addr2, TEST_TIMESTAMP - 1, block.chainid);
     }
 
@@ -286,7 +287,7 @@ contract InventoryPool01Test is Test, Helper {
         vm.prank(poolOwner);
         wethInventoryPool.borrow(1 * 10**18, addr1, addr1, TEST_TIMESTAMP + 1 days, block.chainid);
 
-        vm.expectRevert(ZeroRepayment.selector);
+        vm.expectRevert(IInventoryPool01.ZeroRepayment.selector);
         wethInventoryPool.repay(0, addr1);
     }
 
@@ -295,7 +296,7 @@ contract InventoryPool01Test is Test, Helper {
         vm.prank(WETH_WHALE);
         wethInventoryPool.deposit(1_000 * 10**18, poolOwner);
 
-        vm.expectRevert(NoDebt.selector);
+        vm.expectRevert(IInventoryPool01.NoDebt.selector);
         wethInventoryPool.repay(1 * 10**18, addr1);
     }
 
@@ -604,7 +605,7 @@ contract InventoryPool01Test is Test, Helper {
 
         // Try to withdraw more than available liquidity (1000 - 900 = 100 WETH available)
         vm.prank(addr1);
-        vm.expectRevert(InsufficientLiquidity.selector);
+        vm.expectRevert(IInventoryPool01.InsufficientLiquidity.selector);
         wethInventoryPool.withdraw(200 * 10**18, addr1, addr1);
     }
 
@@ -657,7 +658,7 @@ contract InventoryPool01Test is Test, Helper {
 
     // Tests receive function reverts ETH transfers
     function testInventoryPool01_receive() public {
-        vm.expectRevert(NotSupported.selector);
+        vm.expectRevert(IInventoryPool01.NotSupported.selector);
         address(wethInventoryPool).call{value: 1 ether}("");
     }
 }
