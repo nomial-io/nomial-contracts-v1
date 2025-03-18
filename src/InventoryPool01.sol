@@ -49,7 +49,7 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
         string memory symbol,
         uint initAmount,
         address owner,
-        address params_
+        address paramsContract
     ) ERC4626(IERC20(asset_)) ERC20(name, symbol) Ownable(owner) {
         /**
          * deployer is responsible for burning a small deposit to mitigate inflation attack.
@@ -58,7 +58,7 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
          */
         deposit(initAmount, 0x000000000000000000000000000000000000dEaD);
 
-        params = IInventoryPoolParams01(params_);
+        params = IInventoryPoolParams01(paramsContract);
     }
 
     /**
@@ -119,10 +119,10 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
     /**
      * @notice Updates the InventoryPoolParams01 contract address
      * @dev Allows upgrading to a new parameters contract while maintaining the same pool
-     * @param params_ The address of the new InventoryPoolParams01 contract
+     * @param paramsContract The address of the new InventoryPoolParams01 contract
      */
-    function upgrageParamsContract(address params_) public onlyOwner() {
-        params = IInventoryPoolParams01(params_);
+    function upgrageParamsContract(address paramsContract) public onlyOwner() {
+        params = IInventoryPoolParams01(paramsContract);
     }
 
     /**
