@@ -77,6 +77,50 @@ contract InventoryPool01Test is Test, Helper {
         WETH_ERC20.approve(address(wethInventoryPool), MAX_UINT);
     }
 
+    // Verify that deposit is transferred to dead address on pool deployment
+    function testInventoryPool01_deposit_toDeadAddress() public {
+        uint depositAmount = 1 * 10**9;
+
+        vm.startPrank(ST_ETH_WHALE);
+        ST_ETH_ERC20.approve(address(poolDeployer), MAX_UINT);
+        (address payable stEthPoolAddress,) = nomialDeployer.deploy(
+            salt3,
+            IERC20(ST_ETH),
+            "nomialSTETH",
+            "nmlSTETH",
+            depositAmount,
+            poolOwner,
+            abi.encode(defaultBaseFee, defaultBaseRate, defaultRate1, defaultRate2, defaultOptimalUtilizationRate, defaultPenaltyRate, defaultPenaltyPeriod),
+            ST_ETH_WHALE
+        );
+        vm.stopPrank();
+        
+        uint shares = InventoryPool01(stEthPoolAddress).balanceOf(DEAD_ADDRESS);
+        assertEq(shares, depositAmount, "ST_ETH deposit should be transferred to dead address");
+    }
+
+    // Verify that that if depositAmount is 0, the deposit is not transferred to dead address
+    function testInventoryPool01_deposit_zeroAmount() public {
+        uint depositAmount = 0;
+
+        vm.startPrank(ST_ETH_WHALE);
+        ST_ETH_ERC20.approve(address(poolDeployer), MAX_UINT);
+        (address payable stEthPoolAddress,) = nomialDeployer.deploy(
+            salt3,
+            IERC20(ST_ETH),
+            "nomialSTETH",
+            "nmlSTETH",
+            depositAmount,
+            poolOwner,
+            abi.encode(defaultBaseFee, defaultBaseRate, defaultRate1, defaultRate2, defaultOptimalUtilizationRate, defaultPenaltyRate, defaultPenaltyPeriod),
+            ST_ETH_WHALE
+        );
+        vm.stopPrank();
+        
+        uint shares = InventoryPool01(stEthPoolAddress).balanceOf(DEAD_ADDRESS);
+        assertEq(shares, 0, "ST_ETH deposit should not be transferred to dead address");
+    }
+
     // Verifies borrow fails when chain ID doesn't match
     function testInventoryPool01_borrow_wrongChainId() public {
         vm.prank(WETH_WHALE);

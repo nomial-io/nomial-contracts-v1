@@ -67,7 +67,9 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
          * this ERC4626 implementation uses offset to make inflation attack un-profitable
          * but burning a small initial deposit eliminates the possibility of a griefing attack
          */
-        deposit(initAmount, DEAD_ADDRESS);
+        if (initAmount > 0) {
+            deposit(initAmount, DEAD_ADDRESS);
+        }
 
         params = paramsContract;
     }
