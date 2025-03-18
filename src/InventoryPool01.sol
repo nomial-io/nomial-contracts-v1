@@ -80,7 +80,7 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
 
         _updateAccumulatedInterestFactor();
 
-        uint scaledDebt_ = amount.mulDiv(1e27, storedAccInterestFactor) + amount.mulDiv(params.baseFee(), 1e27);
+        uint scaledDebt_ = amount.mulDiv(1e27, storedAccInterestFactor, Math.Rounding.Ceil) + amount.mulDiv(params.baseFee(), 1e27, Math.Rounding.Ceil);
         borrowers[borrower].scaledDebt += scaledDebt_;
         scaledReceivables += scaledDebt_;
         if (borrowers[borrower].penaltyCounterStart == 0) {
@@ -206,7 +206,8 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
             // newFactor = oldFactor * (1 + ratePerSecond * secondsSinceLastUpdate)
             return storedAccInterestFactor.mulDiv(
                 1e27 + params.interestRate(_utilizationRate(storedAccInterestFactor)) * (block.timestamp - lastAccumulatedInterestUpdate),
-                1e27
+                1e27,
+                Math.Rounding.Ceil
             );
         }
     }
