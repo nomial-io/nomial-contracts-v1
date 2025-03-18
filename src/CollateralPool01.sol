@@ -88,8 +88,9 @@ contract CollateralPool01 is ICollateralPool01, Ownable, ReentrancyGuardTransien
      */
     function startWithdraw(IERC20 token, uint amount) public nonReentrant() {
         Depositor storage _depositor = depositors[msg.sender];
-        if(_depositor.tokenBalance[token] < amount) {
-            revert InsufficientBalance(_depositor.tokenBalance[token]);
+        uint _balance = _depositor.tokenBalance[token];
+        if(_balance < amount) {
+            revert InsufficientBalance(_balance);
         }
 
         if(amount == 0) {
@@ -98,9 +99,10 @@ contract CollateralPool01 is ICollateralPool01, Ownable, ReentrancyGuardTransien
 
         _depositor.tokenBalance[token] -= amount;
         _depositor.withdrawNonce += 1;
-        _depositor.tokenWithdraws[_depositor.withdrawNonce] = TokenWithdraw(token, block.timestamp, amount);
+        uint _withdrawNonce = _depositor.withdrawNonce;
+        _depositor.tokenWithdraws[_withdrawNonce] = TokenWithdraw(token, block.timestamp, amount);
 
-        emit WithdrawRequested(msg.sender, _depositor.withdrawNonce, block.timestamp, token, amount);
+        emit WithdrawRequested(msg.sender, _withdrawNonce, block.timestamp, token, amount);
     }
 
     /**
@@ -144,8 +146,9 @@ contract CollateralPool01 is ICollateralPool01, Ownable, ReentrancyGuardTransien
      */
     function liquidateBalance(address depositor, IERC20 token, uint amount, address recipient) public nonReentrant() onlyOwner() {
         Depositor storage _depositor = depositors[depositor];
-        if(_depositor.tokenBalance[token] < amount) {
-            revert InsufficientLiquidity(_depositor.tokenBalance[token]);
+        uint _balance = _depositor.tokenBalance[token];
+        if(_balance < amount) {
+            revert InsufficientLiquidity(_balance);
         }
 
         _depositor.tokenBalance[token] -= amount;
@@ -167,12 +170,13 @@ contract CollateralPool01 is ICollateralPool01, Ownable, ReentrancyGuardTransien
     function liquidateWithdraw(uint nonce, address depositor, uint amount, address recipient) public nonReentrant() onlyOwner() {
         Depositor storage _depositor = depositors[depositor];
         TokenWithdraw storage _tokenWithdraw = _depositor.tokenWithdraws[nonce];
-        if (_tokenWithdraw.amount < amount) {
-            revert InsufficientLiquidity(_tokenWithdraw.amount);
+        uint _withdrawAmount = _tokenWithdraw.amount;
+        if (_withdrawAmount < amount) {
+            revert InsufficientLiquidity(_withdrawAmount);
         }
 
         IERC20 token = _tokenWithdraw.token;
-        if (_tokenWithdraw.amount == amount) {
+        if (_withdrawAmount == amount) {
             delete _depositor.tokenWithdraws[nonce];
         } else {
             _tokenWithdraw.amount -= amount;
