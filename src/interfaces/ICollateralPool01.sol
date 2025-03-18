@@ -7,6 +7,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 error InsufficientBalance(uint balance);
 error NothingToWithdraw();
 error WithdrawNotReady(uint withdrawReadyTime);
+error WithdrawAmountZero();
 error InsufficientLiquidity(uint amount);
 error NotSupported();
 

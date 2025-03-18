@@ -230,6 +230,21 @@ contract CollateralPool01Test is Test, Helper {
         vm.stopPrank();
     }
 
+    // Tests startWithdraw with 0 amount
+    function testCollateralPool01_startWithdraw_zeroAmount() public {
+        uint depositAmount = 100 * 10**18;
+
+        // Setup: deposit tokens
+        vm.startPrank(addr1);
+        WETH_ERC20.approve(address(collateralPool), depositAmount);
+        collateralPool.deposit(WETH_ERC20, depositAmount);
+
+        // Expect WithdrawAmountZero error
+        vm.expectRevert(abi.encodeWithSelector(WithdrawAmountZero.selector));
+        collateralPool.startWithdraw(WETH_ERC20, 0);
+        vm.stopPrank();
+    }
+
     // Tests withdraw fails when nothing to withdraw
     function testCollateralPool01_withdraw_nothingToWithdraw() public {
         vm.startPrank(addr1);

@@ -10,6 +10,7 @@ import {
     ICollateralPool01,
     InsufficientBalance,
     NothingToWithdraw,
+    WithdrawAmountZero,
     WithdrawNotReady,
     InsufficientLiquidity,
     NotSupported
@@ -76,6 +77,10 @@ contract CollateralPool01 is ICollateralPool01, Ownable, ReentrancyGuardTransien
     function startWithdraw(IERC20 token, uint amount) public nonReentrant() {
         if(tokenBalance[msg.sender][token] < amount) {
             revert InsufficientBalance(tokenBalance[msg.sender][token]);
+        }
+
+        if(amount == 0) {
+            revert WithdrawAmountZero();
         }
 
         tokenBalance[msg.sender][token] -= amount;
