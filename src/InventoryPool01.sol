@@ -260,12 +260,17 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
         
         if (baseDebtPayment_ > 0) {
             if (baseDebtPayment_ >= baseDebt_) {
+                // full repayment of base debt.
+                // reset penalty counter start time.
                 borrowers[borrower].penaltyCounterStart = 0;
+                // set base debt payment to base debt amount, in case of overpayment
                 baseDebtPayment_ = baseDebt_;
             } else {
-                uint period_ = params.penaltyPeriod();
+                // partial repayment of base debt.
+                // increase the penalty counter start time based on the amount of base debt repaid.
+                uint timeElapsed_ = block.timestamp - borrowers[borrower].penaltyCounterStart;
                 uint paymentRatio_ = baseDebtPayment_.mulDiv(1e27, baseDebt_);
-                borrowers[borrower].penaltyCounterStart = block.timestamp - period_ + paymentRatio_.mulDiv(period_, 1e27);
+                borrowers[borrower].penaltyCounterStart = block.timestamp - timeElapsed_ + paymentRatio_.mulDiv(timeElapsed_, 1e27);
             }
 
             uint scaledDebt_ = baseDebtPayment_.mulDiv(1e27, storedAccInterestFactor, Math.Rounding.Ceil);
