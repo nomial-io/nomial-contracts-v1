@@ -8,7 +8,8 @@ import {IInventoryPoolParams01} from "./interfaces/IInventoryPoolParams01.sol";
 /**
  * @title InventoryPoolParams01
  * @dev Manages the parameters for an InventoryPool. Uses a utilization-based interest rate model
- * similar to Aave v3, where the interest rate increases as utilization increases.
+ * similar to Aave v3, where the interest rate increases as utilization increases
+ * (See https://aave.com/docs/developers/smart-contracts/interest-rate-strategy).
  * All rates are expressed in RAY (1e27) precision.
  */
 contract InventoryPoolParams01 is Ownable, IInventoryPoolParams01 {
@@ -16,14 +17,46 @@ contract InventoryPoolParams01 is Ownable, IInventoryPoolParams01 {
 
     uint constant RAY = 1e27;
 
-    uint private _baseFee;
-    uint private _baseRate;
-    uint private _rate1;
-    uint private _rate2;
-    uint private _optimalUtilizationRate;
-    uint private _penaltyRate;
-    uint private _penaltyPeriod;
+    /// @notice The base fee charged on new borrows. Expressed as a percentage in RAY (1e27) precision.
+    /// @dev This fee is charged upfront when a new borrow is created and is added to the scaled debt
+    uint private immutable _baseFee;
 
+    /// @notice The base interest rate per second. Expressed as a percentage in RAY (1e27) precision.
+    /// @dev This is the minimum interest rate charged regardless of utilization
+    uint private immutable _baseRate;
+
+    /// @notice The slope of the interest rate curve below optimal utilization. Expressed in RAY (1e27) precision.
+    /// @dev Used to calculate interest rate between 0% and optimal utilization
+    uint private immutable _rate1;
+
+    /// @notice The slope of the interest rate curve above optimal utilization. Expressed in RAY (1e27) precision.
+    /// @dev Used to calculate interest rate between optimal and 100% utilization
+    uint private immutable _rate2;
+
+    /// @notice The optimal utilization rate target. Expressed as a percentage in RAY (1e27) precision.
+    /// @dev The point at which the interest rate curve switches from rate1 to rate2 slope
+    uint private immutable _optimalUtilizationRate;
+
+    /// @notice The penalty interest rate per second. Expressed as a percentage in RAY (1e27) precision.
+    /// @dev Added on top of the utilization-based interest rate
+    uint private immutable _penaltyRate;
+
+    /// @notice The duration in seconds before penalty interest starts accruing.
+    /// @dev Used to incentivize repayment of loans within the penalty period
+    uint private immutable _penaltyPeriod;
+
+    /**
+     * @notice Initializes the parameters contract with interest rate model settings
+     * @dev All rate parameters should be in RAY (1e27) precision
+     * @param owner_ The address that will own this contract
+     * @param baseFee_ The upfront fee charged on new borrows
+     * @param baseRate_ The minimum interest rate per second
+     * @param rate1_ The interest rate slope below optimal utilization
+     * @param rate2_ The interest rate slope above optimal utilization
+     * @param optimalUtilizationRate The target utilization rate where slope changes
+     * @param penaltyRate_ The additional interest rate for overdue loans
+     * @param penaltyPeriod_ The duration in seconds before penalty rate applies
+     */
     constructor(
         address owner_,
         uint baseFee_,
