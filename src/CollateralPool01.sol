@@ -26,10 +26,15 @@ contract CollateralPool01 is ICollateralPool01, Ownable, ReentrancyGuardTransien
         uint amount;
     }
 
+    struct Depositor {
+        mapping(IERC20 => uint) tokenBalance;
+        mapping(uint => TokenWithdraw) tokenWithdraws;
+        uint withdrawNonce;
+    }
+
     uint public withdrawPeriod;
-    mapping(address => mapping(IERC20 => uint)) public tokenBalance;
-    mapping(address => mapping(uint => TokenWithdraw)) public tokenWithdraws;
-    mapping(address => uint) public withdrawNonce;
+
+    mapping(address => Depositor) internal depositors;
 
     /**
      * @notice Initializes the collateral pool with an owner and withdrawal period
@@ -51,7 +56,7 @@ contract CollateralPool01 is ICollateralPool01, Ownable, ReentrancyGuardTransien
      * @custom:emits Deposited event with depositor address, token, and amount
      */
     function deposit(IERC20 token, uint amount) public nonReentrant() {
-        tokenBalance[msg.sender][token] += amount;
+        depositors[msg.sender].tokenBalance[token] += amount;
         token.safeTransferFrom(msg.sender, address(this), amount);
 
         emit Deposited(msg.sender, token, amount);
@@ -66,19 +71,20 @@ contract CollateralPool01 is ICollateralPool01, Ownable, ReentrancyGuardTransien
      * @custom:revert InsufficientBalance if the depositor's balance is less than the requested amount
      */
     function startWithdraw(IERC20 token, uint amount) public nonReentrant() {
-        if(tokenBalance[msg.sender][token] < amount) {
-            revert InsufficientBalance(tokenBalance[msg.sender][token]);
+        Depositor storage _depositor = depositors[msg.sender];
+        if(_depositor.tokenBalance[token] < amount) {
+            revert InsufficientBalance(_depositor.tokenBalance[token]);
         }
 
         if(amount == 0) {
             revert WithdrawAmountZero();
         }
 
-        tokenBalance[msg.sender][token] -= amount;
-        withdrawNonce[msg.sender] += 1;
-        tokenWithdraws[msg.sender][withdrawNonce[msg.sender]] = TokenWithdraw(token, block.timestamp, amount);
+        _depositor.tokenBalance[token] -= amount;
+        _depositor.withdrawNonce += 1;
+        _depositor.tokenWithdraws[_depositor.withdrawNonce] = TokenWithdraw(token, block.timestamp, amount);
 
-        emit WithdrawRequested(msg.sender, withdrawNonce[msg.sender], block.timestamp, token, amount);
+        emit WithdrawRequested(msg.sender, _depositor.withdrawNonce, block.timestamp, token, amount);
     }
 
     /**
@@ -90,7 +96,8 @@ contract CollateralPool01 is ICollateralPool01, Ownable, ReentrancyGuardTransien
      * @custom:revert WithdrawNotReady if the withdrawal period hasn't elapsed
      */
     function withdraw(uint nonce) public nonReentrant() {
-        TokenWithdraw storage _tokenWithdraw = tokenWithdraws[msg.sender][nonce];
+        Depositor storage _depositor = depositors[msg.sender];
+        TokenWithdraw storage _tokenWithdraw = _depositor.tokenWithdraws[nonce];
         uint amount = _tokenWithdraw.amount;
         IERC20 token = _tokenWithdraw.token;
 
@@ -103,7 +110,7 @@ contract CollateralPool01 is ICollateralPool01, Ownable, ReentrancyGuardTransien
             revert WithdrawNotReady(withdrawReadyTime);
         }
 
-        delete tokenWithdraws[msg.sender][nonce];
+        delete _depositor.tokenWithdraws[nonce];
         token.safeTransfer(msg.sender, amount);
 
         emit WithdrawCompleted(msg.sender, nonce, token, amount);
@@ -120,11 +127,12 @@ contract CollateralPool01 is ICollateralPool01, Ownable, ReentrancyGuardTransien
      * @custom:revert InsufficientLiquidity if the depositor's balance is less than the liquidation amount
      */
     function liquidateBalance(address depositor, IERC20 token, uint amount, address recipient) public nonReentrant() onlyOwner() {
-        if(tokenBalance[depositor][token] < amount) {
-            revert InsufficientLiquidity(tokenBalance[depositor][token]);
+        Depositor storage _depositor = depositors[depositor];
+        if(_depositor.tokenBalance[token] < amount) {
+            revert InsufficientLiquidity(_depositor.tokenBalance[token]);
         }
 
-        tokenBalance[depositor][token] -= amount;
+        _depositor.tokenBalance[token] -= amount;
         token.safeTransfer(recipient, amount);
 
         emit BalanceLiquidated(depositor, token, amount, recipient);
@@ -141,14 +149,15 @@ contract CollateralPool01 is ICollateralPool01, Ownable, ReentrancyGuardTransien
      * @custom:revert InsufficientLiquidity if the withdrawal amount is less than the liquidation amount
      */
     function liquidateWithdraw(uint nonce, address depositor, uint amount, address recipient) public nonReentrant() onlyOwner() {
-        TokenWithdraw storage _tokenWithdraw = tokenWithdraws[depositor][nonce];
+        Depositor storage _depositor = depositors[depositor];
+        TokenWithdraw storage _tokenWithdraw = _depositor.tokenWithdraws[nonce];
         if (_tokenWithdraw.amount < amount) {
             revert InsufficientLiquidity(_tokenWithdraw.amount);
         }
 
         IERC20 token = _tokenWithdraw.token;
         if (_tokenWithdraw.amount == amount) {
-            delete tokenWithdraws[depositor][nonce];
+            delete _depositor.tokenWithdraws[nonce];
         } else {
             _tokenWithdraw.amount -= amount;
         }
@@ -166,6 +175,41 @@ contract CollateralPool01 is ICollateralPool01, Ownable, ReentrancyGuardTransien
     function updateWithdrawPeriod(uint newWithdrawPeriod) public onlyOwner() {
         withdrawPeriod = newWithdrawPeriod;
         emit WithdrawPeriodUpdated(newWithdrawPeriod);
+    }
+
+    /**
+     * @notice Returns the depositor's balance of a token
+     * @dev Retrieves the current balance of a token from the depositors mapping
+     * @param depositor The depositor's address
+     * @param token The ERC20 token address
+     * @return The depositor's balance of the token
+     */
+    function tokenBalance(address depositor, IERC20 token) public view returns (uint) {
+        return depositors[depositor].tokenBalance[token];
+    }
+
+    /**
+     * @notice Returns the details of a specific withdrawal request made by a depositor
+     * @dev Retrieves the token, start time, and amount for a given depositor and withdrawal nonce
+     * @param depositor The depositor's address
+     * @param nonce Unique identifier of the withdrawal request
+     * @return token The ERC20 token being withdrawn
+     * @return startTime The timestamp when the withdrawal request was initiated
+     * @return amount The amount of tokens requested for withdrawal
+     */
+    function tokenWithdraws(address depositor, uint nonce) public view returns (IERC20 token, uint startTime, uint amount) {
+        TokenWithdraw memory _tokenWithdraw = depositors[depositor].tokenWithdraws[nonce];
+        return (_tokenWithdraw.token, _tokenWithdraw.startTime, _tokenWithdraw.amount);
+    }
+
+    /**
+     * @notice Returns the current withdrawal nonce for a depositor
+     * @dev This nonce starts at 0 and increments with each new withdrawal request
+     * @param depositor The depositor's address
+     * @return The current withdrawal nonce for the depositor
+     */
+    function withdrawNonce(address depositor) public view returns (uint) {
+        return depositors[depositor].withdrawNonce;
     }
 
     /**

@@ -24,7 +24,7 @@ interface ICollateralPool01 {
     function liquidateBalance(address depositor, IERC20 token, uint amount, address recipient) external;
     function liquidateWithdraw(uint nonce, address depositor, uint amount, address recipient) external;
     function updateWithdrawPeriod(uint newWithdrawPeriod) external;
-    
+
     function withdrawPeriod() external view returns (uint);
     function tokenBalance(address depositor, IERC20 token) external view returns (uint);
     function tokenWithdraws(address depositor, uint nonce) external view returns (IERC20 token, uint startTime, uint amount);
