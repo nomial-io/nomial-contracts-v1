@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity ^0.8.0;
 
+import {IInventoryPoolParams01} from "./IInventoryPoolParams01.sol";
+
 interface IInventoryPool01 {
     event Borrowed(address indexed borrower, address indexed recipient, uint amount);
     event PenaltyRepayment(address indexed borrower, uint penaltyDebt, uint penaltyPaymentAmount);
@@ -14,7 +16,7 @@ interface IInventoryPool01 {
 
     function borrow(uint amount, address borrower, address recipient, uint expiry, uint chainId) external;
     function repay(uint amount, address borrower) external;
-    function upgrageParamsContract (address paramsContract) external;
+    function upgrageParamsContract (IInventoryPoolParams01 paramsContract) external;
 
     function totalAssets() external view returns (uint);
     function totalReceivables() external view returns (uint);
