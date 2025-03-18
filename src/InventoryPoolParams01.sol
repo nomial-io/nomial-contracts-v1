@@ -28,7 +28,7 @@ contract InventoryPoolParams01 is Ownable, IInventoryPoolParams01 {
         uint baseRate_,
         uint rate1_,
         uint rate2_,
-        uint optimalUtilizationRate_,
+        uint optimalUtilizationRate,
         uint penaltyRate_,
         uint penaltyPeriod_
     ) Ownable(owner_) {
@@ -36,7 +36,7 @@ contract InventoryPoolParams01 is Ownable, IInventoryPoolParams01 {
         _baseRate = baseRate_;
         _rate1 = rate1_;
         _rate2 = rate2_;
-        _optimalUtilizationRate = optimalUtilizationRate_;
+        _optimalUtilizationRate = optimalUtilizationRate;
         _penaltyRate = penaltyRate_;
         _penaltyPeriod = penaltyPeriod_;
     }
@@ -57,17 +57,17 @@ contract InventoryPoolParams01 is Ownable, IInventoryPoolParams01 {
      * - Below optimal: rate = baseRate + (rate1 * utilization / optimalUtilization)
      * - Above optimal: rate = baseRate + rate1 + (rate2 * (utilization - optimal) / (1 - optimal))
      * All rates are per-second and expressed in 1e27 precision
-     * @param utilizationRate_ The current utilization rate in 1e27 precision
-     * @return interestRate_ The calculated interest rate per second in 1e27 precision
+     * @param utilizationRate The current utilization rate in 1e27 precision
+     * @return interestRate The calculated interest rate per second in 1e27 precision
      * @custom:revert InvalidUtilizationRate If utilization rate exceeds 100% (1e27)
      */
-    function interestRate(uint utilizationRate_) external view returns (uint interestRate_) {
-        if (utilizationRate_ > 1e27) revert InvalidUtilizationRate(utilizationRate_);
+    function interestRate(uint utilizationRate) external view returns (uint) {
+        if (utilizationRate > 1e27) revert InvalidUtilizationRate(utilizationRate);
 
-        if (utilizationRate_ <= _optimalUtilizationRate) {
-            interestRate_ = _baseRate + _rate1.mulDiv(utilizationRate_, _optimalUtilizationRate);
+        if (utilizationRate <= _optimalUtilizationRate) {
+            return _baseRate + _rate1.mulDiv(utilizationRate, _optimalUtilizationRate);
         } else {
-            interestRate_ = _baseRate + _rate1 + _rate2.mulDiv((utilizationRate_ - _optimalUtilizationRate), (1e27 - _optimalUtilizationRate));
+            return _baseRate + _rate1 + _rate2.mulDiv((utilizationRate - _optimalUtilizationRate), (1e27 - _optimalUtilizationRate));
         }
     }
 
