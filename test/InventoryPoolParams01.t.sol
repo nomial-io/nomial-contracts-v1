@@ -83,7 +83,7 @@ contract InventoryPoolParams01Test is Test, Helper {
 
     // Tests interest rate reverts when utilization exceeds max
     function testInventoryPoolParams01_interestRate_exceedsMaxUtilization() public {
-        vm.expectRevert(IInventoryPoolParams01.InvalidUtilizationRate.selector);
+        vm.expectRevert(abi.encodeWithSelector(IInventoryPoolParams01.InvalidUtilizationRate.selector, 1e27 + 1));
         params.interestRate(1e27 + 1);
     }
 

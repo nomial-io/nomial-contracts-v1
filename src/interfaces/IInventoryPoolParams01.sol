@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 interface IInventoryPoolParams01 {
-    error InvalidUtilizationRate();
+    error InvalidUtilizationRate(uint utilizationRate);
 
     function baseFee() external view returns (uint);
     function interestRate(uint utilizationRate_) external view returns (uint interestRate_);

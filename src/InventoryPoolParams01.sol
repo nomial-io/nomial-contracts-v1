@@ -62,7 +62,7 @@ contract InventoryPoolParams01 is Ownable, IInventoryPoolParams01 {
      * @custom:revert InvalidUtilizationRate If utilization rate exceeds 100% (1e27)
      */
     function interestRate(uint utilizationRate_) external view returns (uint interestRate_) {
-        if (utilizationRate_ > 1e27) revert InvalidUtilizationRate();
+        if (utilizationRate_ > 1e27) revert InvalidUtilizationRate(utilizationRate_);
 
         if (utilizationRate_ <= _optimalUtilizationRate) {
             interestRate_ = _baseRate + _rate1.mulDiv(utilizationRate_, _optimalUtilizationRate);
