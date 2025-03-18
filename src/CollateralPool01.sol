@@ -34,13 +34,13 @@ contract CollateralPool01 is ICollateralPool01, Ownable, ReentrancyGuardTransien
     /**
      * @notice Initializes the collateral pool with an owner and withdrawal period
      * @param owner The address that can liquidate balances and withdrawals
-     * @param withdrawPeriod_ The time period (in seconds) that must elapse between requesting and executing a withdrawal
+     * @param initialWithdrawPeriod The time period (in seconds) that must elapse between requesting and executing a withdrawal
      */
     constructor(
         address owner,
-        uint withdrawPeriod_
+        uint initialWithdrawPeriod
     ) Ownable(owner) {
-        withdrawPeriod = withdrawPeriod_;
+        withdrawPeriod = initialWithdrawPeriod;
     }
 
     /**
@@ -160,12 +160,12 @@ contract CollateralPool01 is ICollateralPool01, Ownable, ReentrancyGuardTransien
     /**
      * @notice Updates the withdrawal period
      * @dev Can only be called by the owner
-     * @param _withdrawPeriod The new withdrawal period in seconds
+     * @param newWithdrawPeriod The new withdrawal period in seconds
      * @custom:emits WithdrawPeriodUpdated event with the new period
      */
-    function updateWithdrawPeriod(uint _withdrawPeriod) public onlyOwner() {
-        withdrawPeriod = _withdrawPeriod;
-        emit WithdrawPeriodUpdated(_withdrawPeriod);
+    function updateWithdrawPeriod(uint newWithdrawPeriod) public onlyOwner() {
+        withdrawPeriod = newWithdrawPeriod;
+        emit WithdrawPeriodUpdated(newWithdrawPeriod);
     }
 
     /**
