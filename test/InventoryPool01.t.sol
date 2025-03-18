@@ -658,7 +658,14 @@ contract InventoryPool01Test is Test, Helper {
 
     // Tests receive function reverts ETH transfers
     function testInventoryPool01_receive() public {
-        vm.expectRevert(IInventoryPool01.NotSupported.selector);
-        address(wethInventoryPool).call{value: 1 ether}("");
+        address payable _wethInventoryPool = payable(address(wethInventoryPool));
+
+        uint balanceBefore = _wethInventoryPool.balance;
+
+        vm.expectRevert();
+        (bool success,) = _wethInventoryPool.call{value: 1 ether}("");
+        assertEq(success, true);
+
+        assertEq(_wethInventoryPool.balance, balanceBefore);
     }
 }

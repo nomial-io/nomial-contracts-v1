@@ -6,7 +6,6 @@ interface IInventoryPool01 {
     event PenaltyRepayment(address indexed borrower, uint penaltyDebt, uint penaltyPaymentAmount);
     event BaseDebtRepayment(address indexed borrower, uint baseDebt, uint baseDebtPaymentAmount);
 
-    error NotSupported();
     error Expired();
     error NoDebt();
     error ZeroRepayment();

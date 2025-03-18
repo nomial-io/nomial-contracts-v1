@@ -396,12 +396,4 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
 
         return (_baseDebt(borrower, accInterestFactor) * penaltyTime_).mulDiv(params.penaltyRate(), 1e27) - borrowers[borrower].partialPenaltyPayment;
     }
-
-    /**
-     * @notice Fallback function to prevent accidental ETH deposits
-     * @dev Reverts if ETH is transferred to the pool
-     */
-    receive() external payable {
-        revert NotSupported();
-    }
 }

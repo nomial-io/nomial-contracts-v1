@@ -595,7 +595,14 @@ contract CollateralPool01Test is Test, Helper {
 
     // Tests that sending ETH to the contract reverts
     function testCollateralPool01_receive() public {
-        vm.expectRevert(ICollateralPool01.NotSupported.selector);
-        address(collateralPool).call{value: 1 ether}("");
+        address payable _collateralPool = payable(address(collateralPool));
+
+        uint balanceBefore = _collateralPool.balance;
+
+        vm.expectRevert();
+        (bool success,) = _collateralPool.call{value: 1 ether}("");
+        assertEq(success, true);
+
+        assertEq(_collateralPool.balance, balanceBefore);
     }
 }

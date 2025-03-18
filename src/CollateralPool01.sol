@@ -236,13 +236,4 @@ contract CollateralPool01 is ICollateralPool01, Ownable, ReentrancyGuardTransien
     function withdrawNonce(address depositor) public view returns (uint) {
         return depositors[depositor].withdrawNonce;
     }
-
-    /**
-     * @notice Prevents accidental ETH transfers to the contract
-     * @dev Reverts any ETH transfer to the contract
-     * @custom:revert NotSupported for any ETH transfer
-     */
-    receive() external payable {
-        revert NotSupported();
-    }
 }
