@@ -11,7 +11,7 @@ interface IInventoryPool01 {
     error NoDebt();
     error ZeroRepayment();
     error InsufficientLiquidity();
-    error WrongChainId();
+    error WrongChainId(uint chainId);
 
     function borrow(uint amount, address borrower, address recipient, uint expiry, uint chainId) external;
     function repay(uint amount, address borrower) external;

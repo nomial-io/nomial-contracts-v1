@@ -84,7 +84,7 @@ contract InventoryPool01Test is Test, Helper {
 
         vm.warp(TEST_TIMESTAMP);
         vm.prank(poolOwner);
-        vm.expectRevert(IInventoryPool01.WrongChainId.selector);
+        vm.expectRevert(abi.encodeWithSelector(IInventoryPool01.WrongChainId.selector, block.chainid + 1));
         wethInventoryPool.borrow(1*10**18, addr1, addr2, TEST_TIMESTAMP + 1 days, block.chainid + 1);
     }
 

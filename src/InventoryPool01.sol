@@ -67,7 +67,7 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
      */
     function borrow(uint amount, address borrower, address recipient, uint expiry, uint chainId) external nonReentrant() onlyOwner() {
         if (block.timestamp > expiry) revert Expired();
-        if (block.chainid != chainId) revert WrongChainId();
+        if (block.chainid != chainId) revert WrongChainId(chainId);
 
         _updateAccumulatedInterestFactor();
 
