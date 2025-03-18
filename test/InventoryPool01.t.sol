@@ -702,6 +702,53 @@ contract InventoryPool01Test is Test, Helper {
         assertEq(poolFinalBalance, poolInitialBalance, "Pool balance should remain unchanged");
     }
 
+    // Tests owner's ability to upgrade params contract
+    function testInventoryPool01_upgradeParamsContract() public {
+        // Deploy new params contract
+        vm.startPrank(poolOwner);
+        address payable newParamsAddress = paramsDeployer.deployParams(
+            salt4,
+            poolOwner,
+            abi.encode(defaultBaseFee, defaultBaseRate, defaultRate1, defaultRate2, defaultOptimalUtilizationRate, defaultPenaltyRate, defaultPenaltyPeriod)
+        );
+        
+        // Expect event emission
+        vm.expectEmit(true, true, false, true, address(wethInventoryPool));
+        emit IInventoryPool01.ParamsContractUpgraded(IInventoryPoolParams01(newParamsAddress));
+        
+        // Upgrade params contract
+        wethInventoryPool.upgradeParamsContract(IInventoryPoolParams01(newParamsAddress));
+        vm.stopPrank();
+
+        // Verify params contract was updated
+        assertEq(address(wethInventoryPool.params()), newParamsAddress, "Params contract should be updated");
+    }
+
+    // Tests non-owner cannot upgrade params contract
+    function testInventoryPool01_upgradeParamsContract_notOwner() public {
+        // Deploy new params contract
+        vm.prank(poolOwner);
+        address payable newParamsAddress = paramsDeployer.deployParams(
+            salt4,
+            poolOwner,
+            abi.encode(defaultBaseFee, defaultBaseRate, defaultRate1, defaultRate2, defaultOptimalUtilizationRate, defaultPenaltyRate, defaultPenaltyPeriod)
+        );
+        
+        // Try to upgrade params contract as non-owner
+        vm.prank(addr1);
+        vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", addr1));
+        wethInventoryPool.upgradeParamsContract(IInventoryPoolParams01(newParamsAddress));
+    }
+
+    // Tests error emitted if params contract is not changed
+    function testInventoryPool01_upgradeParamsContract_paramsNotChanged() public {
+        IInventoryPoolParams01 oldParams = wethInventoryPool.params();
+
+        vm.prank(poolOwner);
+        vm.expectRevert(IInventoryPool01.ParamsContractNotChanged.selector);
+        wethInventoryPool.upgradeParamsContract(oldParams);
+    }
+
     // Tests receive function reverts ETH transfers
     function testInventoryPool01_receive() public {
         address payable _wethInventoryPool = payable(address(wethInventoryPool));

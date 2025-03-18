@@ -7,16 +7,18 @@ interface IInventoryPool01 {
     event Borrowed(address indexed borrower, address indexed recipient, uint amount);
     event PenaltyRepayment(address indexed borrower, uint penaltyDebt, uint penaltyPaymentAmount);
     event BaseDebtRepayment(address indexed borrower, uint baseDebt, uint baseDebtPaymentAmount);
+    event ParamsContractUpgraded(IInventoryPoolParams01 indexed paramsContract);
 
     error Expired();
     error NoDebt();
     error ZeroRepayment();
     error InsufficientLiquidity();
     error WrongChainId(uint chainId);
+    error ParamsContractNotChanged();
 
     function borrow(uint amount, address borrower, address recipient, uint expiry, uint chainId) external;
     function repay(uint amount, address borrower) external;
-    function upgrageParamsContract (IInventoryPoolParams01 paramsContract) external;
+    function upgradeParamsContract(IInventoryPoolParams01 paramsContract) external;
 
     function totalAssets() external view returns (uint);
     function totalReceivables() external view returns (uint);
