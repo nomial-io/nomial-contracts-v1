@@ -20,20 +20,34 @@ import {ICollateralPool01} from "./interfaces/ICollateralPool01.sol";
 contract CollateralPool01 is ICollateralPool01, Ownable, ReentrancyGuardTransient {
     using SafeERC20 for IERC20;
 
+    /**
+     * @dev Represents a pending withdrawal request
+     * @param token The ERC20 token being withdrawn
+     * @param startTime The timestamp when the withdrawal request was initiated
+     * @param amount The amount of tokens requested for withdrawal
+     */
     struct TokenWithdraw {
         IERC20 token;
         uint startTime;
         uint amount;
     }
 
+    /**
+     * @dev Stores a depositor's token balances, withdrawal requests, and withdrawal nonce
+     * @param tokenBalance Stores a depositor's token balances
+     * @param tokenWithdraws Stores a depositor's withdrawal requests
+     * @param withdrawNonce A unique identifier that increments when the depositor makes a new withdrawal request
+     */
     struct Depositor {
         mapping(IERC20 => uint) tokenBalance;
         mapping(uint => TokenWithdraw) tokenWithdraws;
         uint withdrawNonce;
     }
 
+    /// @notice The time period (in seconds) that must elapse between requesting and executing a withdrawal
     uint public withdrawPeriod;
 
+    /// @dev Internal mapping to store depositor data
     mapping(address => Depositor) internal depositors;
 
     /**
