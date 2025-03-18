@@ -9,12 +9,6 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {IInventoryPool01} from "./interfaces/IInventoryPool01.sol";
 import {IInventoryPoolParams01} from "./interfaces/IInventoryPoolParams01.sol";
 
-struct BorrowerData {
-    uint scaledDebt;
-    uint penaltyCounterStart;
-    uint partialPenaltyPayment;
-}
-
 /**
  * @title InventoryPool01
  * @dev An ERC4626-compliant lending pool that allows borrowing by the pool owner and tracks debt
@@ -28,12 +22,35 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
     using Math for uint256;
     using SafeERC20 for IERC20;
 
+    /**
+     * @dev Represents a borrower's debt position and penalty status
+     * @param scaledDebt The borrower's debt amount scaled by the global accumulated interest factor
+     * @param penaltyCounterStart The timestamp when the penalty counter started for this borrower. 0 if not in penalty period
+     * @param partialPenaltyPayment The amount of penalty debt that has been partially paid. 0 if not in penalty period, or no
+     * partial payment
+     */
+    struct Borrower {
+        uint scaledDebt;
+        uint penaltyCounterStart;
+        uint partialPenaltyPayment;
+    }
+
+    /// @notice The contract that defines interest rates, fees, and penalty settings for this pool
     IInventoryPoolParams01 public params;
+
+    /// @notice The global accumulated interest factor used for debt scaling, stored in 1e27 precision
+    /// @dev Although this is public, it is not recommended to read it directly. Instead use the `accumulatedInterestFactor()`
+    /// function which will calculate the interest factor based on the current time and the last update timestamp.
     uint public storedAccInterestFactor;
+
+    /// @notice The timestamp of the last stored accumulated interest factor update
     uint public lastAccumulatedInterestUpdate;
+
+    /// @notice The total scaled debt of all borrowers, used to calculate total receivables
     uint public scaledReceivables;
 
-    mapping(address => BorrowerData) public borrowers;
+    /// @notice Maps borrower addresses to their debt positions and penalty status data
+    mapping(address => Borrower) public borrowers;
 
     constructor(
         IERC20 asset_,
