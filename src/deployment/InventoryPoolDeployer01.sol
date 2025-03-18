@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.0;
 
 import {InventoryPool01} from "../InventoryPool01.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
