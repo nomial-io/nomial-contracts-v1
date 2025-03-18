@@ -7,12 +7,6 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 import {ICollateralPool01} from "./interfaces/ICollateralPool01.sol";
 
-struct TokenWithdraw {
-    IERC20 token;
-    uint startTime;
-    uint amount;
-}
-
 /**
  * @title CollateralPool01
  * @dev A contract for managing collateral deposits and withdrawals of multiple ERC20 tokens.
@@ -25,6 +19,12 @@ struct TokenWithdraw {
  */
 contract CollateralPool01 is ICollateralPool01, Ownable, ReentrancyGuardTransient {
     using SafeERC20 for IERC20;
+
+    struct TokenWithdraw {
+        IERC20 token;
+        uint startTime;
+        uint amount;
+    }
 
     uint public withdrawPeriod;
     mapping(address => mapping(IERC20 => uint)) public tokenBalance;
