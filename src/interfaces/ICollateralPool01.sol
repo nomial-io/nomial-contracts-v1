@@ -16,6 +16,7 @@ interface ICollateralPool01 {
     error WithdrawNotReady(uint withdrawReadyTime);
     error WithdrawAmountZero();
     error InsufficientLiquidity(uint amount);
+    error PeriodNotChanged();
     error NotSupported();
 
     function deposit(IERC20 token, uint amount) external;

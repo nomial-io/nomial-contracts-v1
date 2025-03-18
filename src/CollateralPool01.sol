@@ -193,7 +193,12 @@ contract CollateralPool01 is ICollateralPool01, Ownable, ReentrancyGuardTransien
      * @custom:emits WithdrawPeriodUpdated event with the new period
      */
     function updateWithdrawPeriod(uint newWithdrawPeriod) public onlyOwner() {
+        if (withdrawPeriod == newWithdrawPeriod) {
+            revert PeriodNotChanged();
+        }
+
         withdrawPeriod = newWithdrawPeriod;
+
         emit WithdrawPeriodUpdated(newWithdrawPeriod);
     }
 

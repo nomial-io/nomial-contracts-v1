@@ -584,6 +584,15 @@ contract CollateralPool01Test is Test, Helper {
         );
     }
 
+    // Test updateWithdrawPeriod fails if new period is the same as the old period
+    function testCollateralPool01_updateWithdrawPeriod_samePeriod() public {
+        uint oldWithdrawPeriod = collateralPool.withdrawPeriod();
+        vm.startPrank(owner);
+        vm.expectRevert(ICollateralPool01.PeriodNotChanged.selector);
+        collateralPool.updateWithdrawPeriod(oldWithdrawPeriod);
+        vm.stopPrank();
+    }
+
     // Tests that sending ETH to the contract reverts
     function testCollateralPool01_receive() public {
         vm.expectRevert(ICollateralPool01.NotSupported.selector);
