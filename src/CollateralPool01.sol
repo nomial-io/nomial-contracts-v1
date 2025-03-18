@@ -60,6 +60,8 @@ contract CollateralPool01 is ICollateralPool01, Ownable, ReentrancyGuardTransien
         uint initialWithdrawPeriod
     ) Ownable(owner) {
         withdrawPeriod = initialWithdrawPeriod;
+
+        emit WithdrawPeriodUpdated(initialWithdrawPeriod);
     }
 
     /**

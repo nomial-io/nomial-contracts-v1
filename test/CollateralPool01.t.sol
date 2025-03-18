@@ -16,7 +16,17 @@ contract CollateralPool01Test is Test, Helper {
 
     function setUp() public {
         setupAll();
+
+        // test emit WithdrawPeriodUpdated event
+        address computedCollateralPoolAddr = vm.computeCreateAddress(owner, 0);
+        vm.expectEmit(true, false, false, true, computedCollateralPoolAddr);
+        emit ICollateralPool01.WithdrawPeriodUpdated(WITHDRAW_PERIOD);
+
+        // deploy CollateralPool01
+        vm.prank(owner);
         collateralPool = new CollateralPool01(owner, WITHDRAW_PERIOD);
+        console.log("collateralPool", address(collateralPool));
+        assertEq(collateralPool.withdrawPeriod(), WITHDRAW_PERIOD, "Withdraw period should be correctly set");
 
         // Transfer WETH to test addresses
         vm.startPrank(WETH_WHALE);
