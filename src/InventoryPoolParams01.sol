@@ -9,10 +9,12 @@ import {IInventoryPoolParams01} from "./interfaces/IInventoryPoolParams01.sol";
  * @title InventoryPoolParams01
  * @dev Manages the parameters for an InventoryPool. Uses a utilization-based interest rate model
  * similar to Aave v3, where the interest rate increases as utilization increases.
- * All rates are expressed in 1e27 precision.
+ * All rates are expressed in RAY (1e27) precision.
  */
 contract InventoryPoolParams01 is Ownable, IInventoryPoolParams01 {
     using Math for uint256;
+
+    uint constant RAY = 1e27;
 
     uint private _baseFee;
     uint private _baseRate;
@@ -43,9 +45,9 @@ contract InventoryPoolParams01 is Ownable, IInventoryPoolParams01 {
 
     /**
      * @notice Returns the base fee charged on new borrows
-     * @dev The base fee is a fixed percentage expressed in 1e27 precision that is charged
+     * @dev The base fee is a fixed percentage expressed in RAY (1e27) precision that is charged
      * upfront when a new borrow is created
-     * @return The base fee as a percentage in 1e27 precision
+     * @return The base fee as a percentage in RAY (1e27) precision
      */
     function baseFee() external view returns (uint) {
         return _baseFee;
@@ -56,26 +58,26 @@ contract InventoryPoolParams01 is Ownable, IInventoryPoolParams01 {
      * @dev Uses a two-slope model similar to Aave v3:
      * - Below optimal: rate = baseRate + (rate1 * utilization / optimalUtilization)
      * - Above optimal: rate = baseRate + rate1 + (rate2 * (utilization - optimal) / (1 - optimal))
-     * All rates are per-second and expressed in 1e27 precision
-     * @param utilizationRate The current utilization rate in 1e27 precision
-     * @return interestRate The calculated interest rate per second in 1e27 precision
+     * All rates are per-second and expressed in RAY (1e27) precision
+     * @param utilizationRate The current utilization rate in RAY (1e27) precision
+     * @return interestRate The calculated interest rate per second in RAY (1e27) precision
      * @custom:revert InvalidUtilizationRate If utilization rate exceeds 100% (1e27)
      */
     function interestRate(uint utilizationRate) external view returns (uint) {
-        if (utilizationRate > 1e27) revert InvalidUtilizationRate(utilizationRate);
+        if (utilizationRate > RAY) revert InvalidUtilizationRate(utilizationRate);
 
         if (utilizationRate <= _optimalUtilizationRate) {
             return _baseRate + _rate1.mulDiv(utilizationRate, _optimalUtilizationRate);
         } else {
-            return _baseRate + _rate1 + _rate2.mulDiv((utilizationRate - _optimalUtilizationRate), (1e27 - _optimalUtilizationRate));
+            return _baseRate + _rate1 + _rate2.mulDiv((utilizationRate - _optimalUtilizationRate), (RAY - _optimalUtilizationRate));
         }
     }
 
     /**
      * @notice Returns the penalty interest rate applied after the penalty period
      * @dev The penalty rate is added on top of the regular interest rate when a loan
-     * exceeds its penalty period. Rate is per-second in 1e27 precision
-     * @return The penalty rate per second in 1e27 precision
+     * exceeds its penalty period. Rate is per-second in RAY (1e27) precision
+     * @return The penalty rate per second in RAY (1e27) precision
      */
     function penaltyRate() external view returns (uint) {
         return _penaltyRate;

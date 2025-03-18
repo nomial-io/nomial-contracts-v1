@@ -11,6 +11,8 @@ contract InventoryPoolParams01Test is Test, Helper {
     InventoryPoolParams01 public params;
     address public constant owner = 0xFD1066acf2FC47F3b2DaCec43E76321644dC9928;
 
+    uint constant RAY = 1e27;
+
     function setUp() public {
         setupAll();
         params = new InventoryPoolParams01(
@@ -63,33 +65,33 @@ contract InventoryPoolParams01Test is Test, Helper {
 
     // Tests interest rate at full utilization
     function testInventoryPoolParams01_interestRate_fullUtilization() public {
-        uint interestRate = params.interestRate(1e27);
+        uint interestRate = params.interestRate(RAY);
         uint expectedRate = defaultBaseRate + defaultRate1 + defaultRate2;
         assertEq(interestRate, expectedRate, "Interest rate at 100% utilization should equal base rate + rate1 + rate2");
     }
 
     // Tests interest rate between optimal and full utilization
     function testInventoryPoolParams01_interestRate_betweenOptimalAndFull() public {
-        uint optToFullDiff = 1e27 - defaultOptimalUtilizationRate;
+        uint optToFullDiff = RAY - defaultOptimalUtilizationRate;
         uint utilizationRate = defaultOptimalUtilizationRate + (optToFullDiff * 75) / 100;
         
         uint interestRate = params.interestRate(utilizationRate);
         uint expectedRate = defaultBaseRate + defaultRate1 + 
             (defaultRate2 * (utilizationRate - defaultOptimalUtilizationRate)) / 
-            (1e27 - defaultOptimalUtilizationRate);
+            (RAY - defaultOptimalUtilizationRate);
 
         assertEq(interestRate, expectedRate, "Interest rate should be correctly interpolated between optimal and full");
     }
 
     // Tests interest rate reverts when utilization exceeds max
     function testInventoryPoolParams01_interestRate_exceedsMaxUtilization() public {
-        vm.expectRevert(abi.encodeWithSelector(IInventoryPoolParams01.InvalidUtilizationRate.selector, 1e27 + 1));
-        params.interestRate(1e27 + 1);
+        vm.expectRevert(abi.encodeWithSelector(IInventoryPoolParams01.InvalidUtilizationRate.selector, RAY + 1));
+        params.interestRate(RAY + 1);
     }
 
     // Tests interest rate at maximum utilization
     function testInventoryPoolParams01_interestRate_atMaxUtilization() public {
-        uint interestRate = params.interestRate(1e27);
+        uint interestRate = params.interestRate(RAY);
         uint expectedRate = defaultBaseRate + defaultRate1 + defaultRate2;
         assertEq(interestRate, expectedRate, "Interest rate at 100% utilization should be baseRate + rate1 + rate2");
     }

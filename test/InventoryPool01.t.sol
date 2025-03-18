@@ -30,6 +30,8 @@ contract InventoryPool01Test is Test, Helper {
     bytes32 public constant salt3 = hex'ed0461bb6636b9669060a1f83779bb5d660330b2a2cd0d04dd3c22533b24aae3';
     bytes32 public constant salt4 = hex'3b9eaf8ca13209dab364d64ca37e15568026112dda9f5dd8d3519338ae882fd7';
 
+    uint constant RAY = 1e27;
+
     function setUp() public {
         setupAll();
         
@@ -158,7 +160,7 @@ contract InventoryPool01Test is Test, Helper {
         vm.stopPrank();
 
         uint baseDebt = wethInventoryPool.baseDebt(addr1);
-        uint expectedDebt = borrowAmount + (borrowAmount * baseFee) / 1e27;
+        uint expectedDebt = borrowAmount + (borrowAmount * baseFee) / RAY;
         assertEq(baseDebt, expectedDebt, "Base debt should equal borrow amount plus base fee");
 
         uint penaltyTime = wethInventoryPool.penaltyTime(addr1);
@@ -186,7 +188,7 @@ contract InventoryPool01Test is Test, Helper {
         vm.warp(TEST_TIMESTAMP + 1 hours);
         
         uint newBaseDebt = wethInventoryPool.baseDebt(addr1);
-        uint expectedDebt = initialBaseDebt + (initialBaseDebt * interestRate * 1 hours) / 1e27;
+        uint expectedDebt = initialBaseDebt + (initialBaseDebt * interestRate * 1 hours) / RAY;
         assertEq(newBaseDebt, expectedDebt, "Base debt should reflect 1 hour of interest");
     }
 
@@ -212,7 +214,7 @@ contract InventoryPool01Test is Test, Helper {
 
         uint penaltyDebt = wethInventoryPool.penaltyDebt(addr1);
         uint baseDebt = wethInventoryPool.baseDebt(addr1);
-        uint expectedPenaltyDebt = (baseDebt * penaltyRate * 12 hours) / 1e27;
+        uint expectedPenaltyDebt = (baseDebt * penaltyRate * 12 hours) / RAY;
         assertEq(penaltyDebt, expectedPenaltyDebt, "Penalty debt should accumulate at penalty rate");
     }
 
@@ -294,7 +296,7 @@ contract InventoryPool01Test is Test, Helper {
         vm.warp(TEST_TIMESTAMP + 1 hours);
         
         uint addr1Debt = wethInventoryPool.baseDebt(addr1);
-        uint addr1ExpectedDebt = addr1InitialDebt + (addr1InitialDebt * interestRate1 * 1 hours) / 1e27;
+        uint addr1ExpectedDebt = addr1InitialDebt + (addr1InitialDebt * interestRate1 * 1 hours) / RAY;
         assertEq(addr1Debt, addr1ExpectedDebt, "Expected debt after 1 hour at interestRate1 should match");
 
         // Large borrow to increase utilization and interestRate
@@ -314,12 +316,12 @@ contract InventoryPool01Test is Test, Helper {
 
         // Check borrower 1 debt reflects both interest rate periods
         addr1Debt = wethInventoryPool.baseDebt(addr1);
-        addr1ExpectedDebt = addr1ExpectedDebt + (addr1ExpectedDebt * interestRate2 * 1 hours) / 1e27;
+        addr1ExpectedDebt = addr1ExpectedDebt + (addr1ExpectedDebt * interestRate2 * 1 hours) / RAY;
         assertEq(addr1Debt, addr1ExpectedDebt, "First borrower should reflect both interest rate periods");
 
         // Check borrower 2 debt reflects only the higher rate
         uint addr2Debt = wethInventoryPool.baseDebt(addr2);
-        uint addr2ExpectedDebt = addr2InitialDebt + (addr2InitialDebt * interestRate2 * 1 hours) / 1e27;
+        uint addr2ExpectedDebt = addr2InitialDebt + (addr2InitialDebt * interestRate2 * 1 hours) / RAY;
         assertEq(addr2Debt, addr2ExpectedDebt, "Second borrower should reflect only the higher interest rate period");
     }
 
