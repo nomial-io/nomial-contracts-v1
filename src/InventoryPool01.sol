@@ -22,6 +22,8 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
     using Math for uint256;
     using SafeERC20 for IERC20;
 
+    address constant DEAD_ADDRESS = 0x000000000000000000000000000000000000dEaD;
+
     /**
      * @dev Represents a borrower's debt position and penalty status
      * @param scaledDebt The borrower's debt amount scaled by the global accumulated interest factor
@@ -65,7 +67,7 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
          * this ERC4626 implementation uses offset to make inflation attack un-profitable
          * but burning a small initial deposit eliminates the possibility of a griefing attack
          */
-        deposit(initAmount, 0x000000000000000000000000000000000000dEaD);
+        deposit(initAmount, DEAD_ADDRESS);
 
         params = paramsContract;
     }
