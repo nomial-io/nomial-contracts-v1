@@ -4,12 +4,12 @@ pragma solidity ^0.8.0;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 interface ICollateralPool01 {
-    event Deposited(address indexed depositor, IERC20 token, uint amount);
-    event WithdrawRequested(address indexed depositor, uint nonce, uint startTime, IERC20 token, uint amount);
-    event WithdrawCompleted(address indexed depositor, uint nonce, IERC20 token, uint amount);
+    event Deposited(address indexed depositor, IERC20 indexed token, uint amount);
+    event WithdrawRequested(address indexed depositor, uint indexed nonce, uint startTime, IERC20 indexed token, uint amount);
+    event WithdrawCompleted(address indexed depositor, uint indexed nonce, IERC20 indexed token, uint amount);
     event WithdrawPeriodUpdated(uint withdrawPeriod);
-    event BalanceLiquidated(address indexed depositor, IERC20 token, uint amount, address recipient);
-    event WithdrawLiquidated(address indexed depositor, uint nonce, IERC20 token, uint amount, address recipient);
+    event BalanceLiquidated(address indexed depositor, IERC20 indexed token, uint amount, address recipient);
+    event WithdrawLiquidated(address indexed depositor, uint indexed nonce, IERC20 indexed token, uint amount, address recipient);
 
     error InsufficientBalance(uint balance);
     error NothingToWithdraw();
