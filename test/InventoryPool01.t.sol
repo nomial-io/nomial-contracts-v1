@@ -11,6 +11,7 @@ import "../src/deployment/InventoryPoolDeployer01.sol";
 import "../src/deployment/InventoryPoolParamsDeployer01.sol";
 import "../src/deployment/NomialDeployer01.sol";
 import "./Helper.sol";
+import "./mocks/InventoryPoolParamsMock.sol";
 
 contract InventoryPool01Test is Test, Helper {
     using Math for uint256;
@@ -760,5 +761,67 @@ contract InventoryPool01Test is Test, Helper {
         assertEq(success, true);
 
         assertEq(_wethInventoryPool.balance, balanceBefore);
+    }
+
+    // Tests that funds can be recovered from pool where _updateAccumulatedInterestFactor() reverts due to arithmetic overflow
+    function testInventoryPool01_withdraw_recoverFromArithmeticOverflowState() public {
+        // 500,000% annual rate (per second)
+        // 500_000n * 10n**25n / (60n * 60n * 24n * 365n);
+        uint largeRate = 158548959918822932521562;
+
+        // 1,000 quadrillion ETH
+        uint largeAmount = 10**36;
+
+        // Deploy mock params contract with extremely large interest rate and base fee
+        InventoryPoolParamsMock mockParams = new InventoryPoolParamsMock(
+            largeRate, // base fee
+            largeRate, // interest rate
+            defaultPenaltyRate,
+            defaultPenaltyPeriod
+        );
+
+        // upgrade params on weth inventory pool
+        vm.prank(poolOwner);
+        wethInventoryPool.upgradeParamsContract(mockParams);
+
+        // deposit large amount of ETH
+        deal(WETH, WETH_WHALE, largeAmount);
+        vm.startPrank(WETH_WHALE);
+        WETH_ERC20.approve(address(wethInventoryPool), largeAmount);
+        wethInventoryPool.deposit(largeAmount, WETH_WHALE);
+        vm.stopPrank();
+
+        vm.startPrank(poolOwner);
+        for (uint i = 0; i < 238; i++) {
+            // fast-forward 1 day and borrow 1 trillion ETH
+            vm.warp(block.timestamp + 1 hours);
+            wethInventoryPool.borrow(10**30, addr1, addr1, block.timestamp, block.chainid);
+        }
+        vm.stopPrank();
+
+        // fast-forward 1 hour. try to withdraw 1 ETH, should revert with arithmetic overflow
+        vm.warp(block.timestamp + 1 hours);
+        vm.startPrank(WETH_WHALE);
+        vm.expectRevert();
+        wethInventoryPool.withdraw(1 * 10**18, WETH_WHALE, WETH_WHALE);
+        vm.stopPrank();
+
+        // set interest rate to 0 by upgrading params contract
+        vm.startPrank(poolOwner);
+        InventoryPoolParamsMock mockParams2 = new InventoryPoolParamsMock(
+            0, // base fee
+            0, // interest rate
+            defaultPenaltyRate,
+            defaultPenaltyPeriod
+        );
+        wethInventoryPool.upgradeParamsContract(mockParams2);
+        vm.stopPrank();
+
+        // fast-forward 1000 years. withdraw 1 ETH should no longer overflow because interest rate is 0
+        vm.warp(block.timestamp + 1000 * 365 days);
+        vm.startPrank(WETH_WHALE);
+        wethInventoryPool.withdraw(1 * 10**18, WETH_WHALE, WETH_WHALE);
+        vm.stopPrank();
+
     }
 }
