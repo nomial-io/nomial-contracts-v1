@@ -763,8 +763,9 @@ contract InventoryPool01Test is Test, Helper {
         assertEq(_wethInventoryPool.balance, balanceBefore);
     }
 
-    // Tests that funds can be recovered from pool where _updateAccumulatedInterestFactor() reverts due to arithmetic overflow
-    function testInventoryPool01_withdraw_recoverFromArithmeticOverflowState() public {
+    // Tests that funds can be recovered from pool where _updateAccumulatedInterestFactor() reverts due to arithmetic overflow.
+    // The only way to force the overflow is to upgrade to a params contract with an unreasonably high interest rate.
+    function testInventoryPool01_updateAccumulatedInterestFactor_recoverFromArithmeticOverflowState() public {
         // 500,000% annual rate (per second)
         // 500_000n * 10n**25n / (60n * 60n * 24n * 365n);
         uint largeRate = 158548959918822932521562;
@@ -793,7 +794,7 @@ contract InventoryPool01Test is Test, Helper {
 
         vm.startPrank(poolOwner);
         for (uint i = 0; i < 238; i++) {
-            // fast-forward 1 day and borrow 1 trillion ETH
+            // fast-forward 1 hour and borrow 1 trillion ETH
             vm.warp(block.timestamp + 1 hours);
             wethInventoryPool.borrow(10**30, addr1, addr1, block.timestamp, block.chainid);
         }
@@ -822,6 +823,46 @@ contract InventoryPool01Test is Test, Helper {
         vm.startPrank(WETH_WHALE);
         wethInventoryPool.withdraw(1 * 10**18, WETH_WHALE, WETH_WHALE);
         vm.stopPrank();
+    }
 
+    // Tests that reasonable values cannot cause arithmetic overflow
+    function testInventoryPool01_updateAccumulatedInterestFactor_noArithmeticOverflowForReasonableValues() public {
+        // 80% annual rate (per second)
+        // 80n * 10n**25n / (60n * 60n * 24n * 365n);
+        uint largeRate = 25367833587011669203;
+
+        // 500 billion ETH
+        uint depositAmount = 500_000_000_000 * 10**18;
+
+        // 50 thousand ETH
+        uint borrowAmount = 50_000 * 10**18;
+
+        // Deploy mock params contract with large but reasonable interest rate
+        InventoryPoolParamsMock mockParams = new InventoryPoolParamsMock(
+            defaultBaseFee,
+            largeRate,
+            defaultPenaltyRate,
+            defaultPenaltyPeriod
+        );
+
+        // upgrade params on weth inventory pool
+        vm.prank(poolOwner);
+        wethInventoryPool.upgradeParamsContract(mockParams);
+
+        // deposit large amount of ETH
+        deal(WETH, WETH_WHALE, depositAmount);
+        vm.startPrank(WETH_WHALE);
+        WETH_ERC20.approve(address(wethInventoryPool), depositAmount);
+        wethInventoryPool.deposit(depositAmount, WETH_WHALE);
+        vm.stopPrank();
+
+        vm.startPrank(poolOwner);
+        // borrow 50 thousand ETH, once per day for 100 years (36,500 days)
+        for (uint i = 0; i < 36_500; i++) {
+            // fast-forward 1 day and borrow 50 thousand ETH
+            vm.warp(block.timestamp + 1 days);
+            wethInventoryPool.borrow(borrowAmount, addr1, addr1, block.timestamp, block.chainid);
+        }
+        vm.stopPrank();
     }
 }
