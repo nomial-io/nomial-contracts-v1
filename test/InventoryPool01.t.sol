@@ -5,12 +5,14 @@ import {Test} from "forge-std/Test.sol";
 import {console} from "forge-std/console.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import "../src/InventoryPool01.sol";
+import "../src/utils/RayMath.sol";
 import {IInventoryPool01} from "../src/interfaces/IInventoryPool01.sol";
 import {IInventoryPoolParams01} from "../src/interfaces/IInventoryPoolParams01.sol";
 import "../src/deployment/InventoryPoolDeployer01.sol";
 import "../src/deployment/InventoryPoolParamsDeployer01.sol";
 import "../src/deployment/NomialDeployer01.sol";
 import "./Helper.sol";
+import "./mocks/InventoryPoolParamsMock.sol";
 
 contract InventoryPool01Test is Test, Helper {
     using Math for uint256;
@@ -188,8 +190,8 @@ contract InventoryPool01Test is Test, Helper {
         vm.warp(TEST_TIMESTAMP + 1 hours);
         
         uint newBaseDebt = wethInventoryPool.baseDebt(addr1);
-        uint expectedDebt = initialBaseDebt + (initialBaseDebt * interestRate * 1 hours) / RAY;
-        assertEq(newBaseDebt, expectedDebt, "Base debt should reflect 1 hour of interest");
+        uint expectedDebt = initialBaseDebt * RayMath.rayPow(RAY + interestRate, 1 hours) / RAY;
+        assertEq(newBaseDebt, expectedDebt, "Base debt should reflect 1 hour of compounded interest");
     }
 
     // Verifies penalty debt calculation after penalty period
@@ -296,7 +298,7 @@ contract InventoryPool01Test is Test, Helper {
         vm.warp(TEST_TIMESTAMP + 1 hours);
         
         uint addr1Debt = wethInventoryPool.baseDebt(addr1);
-        uint addr1ExpectedDebt = addr1InitialDebt + (addr1InitialDebt * interestRate1 * 1 hours) / RAY;
+        uint addr1ExpectedDebt = addr1InitialDebt * RayMath.rayPow(RAY + interestRate1, 1 hours) / RAY;
         assertEq(addr1Debt, addr1ExpectedDebt, "Expected debt after 1 hour at interestRate1 should match");
 
         // Large borrow to increase utilization and interestRate
@@ -309,19 +311,19 @@ contract InventoryPool01Test is Test, Helper {
 
         uint interestRate2 = wethInventoryPool.params().interestRate(wethInventoryPool.utilizationRate());
         uint expectedRate2 = defaultRate1.mulDiv(wethInventoryPool.utilizationRate(), defaultOptimalUtilizationRate);
-        assertEq(interestRate2, expectedRate2, "Interest rate should rate1 * utilizationRate / optimalUtilizationRate");
+        assertEq(interestRate2, expectedRate2, "Interest rate should equal rate1 * utilizationRate / optimalUtilizationRate");
 
         // Move forward another hour to accumulate interest at the higher rate
         vm.warp(TEST_TIMESTAMP + 2 hours);
 
         // Check borrower 1 debt reflects both interest rate periods
         addr1Debt = wethInventoryPool.baseDebt(addr1);
-        addr1ExpectedDebt = addr1ExpectedDebt + (addr1ExpectedDebt * interestRate2 * 1 hours) / RAY;
+        addr1ExpectedDebt = addr1ExpectedDebt * RayMath.rayPow(RAY + interestRate2, 1 hours) / RAY;
         assertEq(addr1Debt, addr1ExpectedDebt, "First borrower should reflect both interest rate periods");
 
         // Check borrower 2 debt reflects only the higher rate
         uint addr2Debt = wethInventoryPool.baseDebt(addr2);
-        uint addr2ExpectedDebt = addr2InitialDebt + (addr2InitialDebt * interestRate2 * 1 hours) / RAY;
+        uint addr2ExpectedDebt = addr2InitialDebt * RayMath.rayPow(RAY + interestRate2, 1 hours) / RAY;
         assertEq(addr2Debt, addr2ExpectedDebt, "Second borrower should reflect only the higher interest rate period");
     }
 
@@ -379,7 +381,7 @@ contract InventoryPool01Test is Test, Helper {
         vm.stopPrank();
 
         // verify base debt is reduced by half
-        assertEq(wethInventoryPool.baseDebt(addr1), baseDebt - partialRepayment, "Base debt should be reduced by half");
+        assertApproxEqAbs(wethInventoryPool.baseDebt(addr1), baseDebt - partialRepayment, 1, "Base debt should be reduced by half");
 
         // verify penalty debt is zero
         assertEq(wethInventoryPool.penaltyDebt(addr1), 0, "Penalty debt should be zero");
@@ -400,7 +402,7 @@ contract InventoryPool01Test is Test, Helper {
 
         // verify ERC20 transfer to pool
         uint poolFinalBalance = IERC20(WETH).balanceOf(address(wethInventoryPool));
-        assertEq(poolFinalBalance - poolInitialBalance, partialRepayment, "Pool should receive the partial base debt payment amount");
+        assertApproxEqAbs(poolFinalBalance - poolInitialBalance, partialRepayment, 1, "Pool should receive the partial base debt payment amount");
     }
 
     // Tests partial repayment of penalty debt
@@ -760,5 +762,113 @@ contract InventoryPool01Test is Test, Helper {
         assertEq(success, true);
 
         assertEq(_wethInventoryPool.balance, balanceBefore);
+    }
+
+    // Tests that reasonable values cannot cause arithmetic overflow
+    function testInventoryPool01_updateAccumulatedInterestFactor_noArithmeticOverflowForReasonableValues() public {
+        // 80% annual rate (per second)
+        // 80n * 10n**25n / (60n * 60n * 24n * 365n);
+        uint largeRate = 25367833587011669203;
+
+        // 500 billion ETH
+        uint depositAmount = 500_000_000_000 * 10**18;
+
+        // 50 thousand ETH
+        uint borrowAmount = 50_000 * 10**18;
+
+        // Deploy mock params contract with large but reasonable interest rate
+        InventoryPoolParamsMock mockParams = new InventoryPoolParamsMock(
+            defaultBaseFee,
+            largeRate,
+            defaultPenaltyRate,
+            defaultPenaltyPeriod
+        );
+
+        // upgrade params on weth inventory pool
+        vm.prank(poolOwner);
+        wethInventoryPool.upgradeParamsContract(mockParams);
+
+        // deposit large amount of ETH
+        deal(WETH, WETH_WHALE, depositAmount);
+        vm.startPrank(WETH_WHALE);
+        WETH_ERC20.approve(address(wethInventoryPool), depositAmount);
+        wethInventoryPool.deposit(depositAmount, WETH_WHALE);
+        vm.stopPrank();
+
+        vm.startPrank(poolOwner);
+        // borrow 50 thousand ETH, once per day for 10 years (3,650 days)
+        for (uint i = 0; i < 3_650; i++) {
+            // fast-forward 1 day and borrow 50 thousand ETH
+            vm.warp(block.timestamp + 1 days);
+            wethInventoryPool.borrow(borrowAmount, addr1, addr1, block.timestamp, block.chainid);
+        }
+        vm.stopPrank();
+    }
+
+    function testInventoryPool01_updateAccumulatedInterestFactor_expectedInterestAmount() public {
+        // 50% annual rate (per second)
+        // 50n * 10n**25n / (60n * 60n * 24n * 365n);
+        uint largeRate = 15854895991882293252;
+
+        // 500 billion ETH
+        uint depositAmount = 500_000_000_000 * 10**18;
+
+        // 50 thousand ETH
+        uint borrowAmount = 50_000 * 10**18;
+
+        uint secondsInYear = 365 * 24 * 60 * 60;
+        
+        // Deploy mock params contract with 80% fixed annual rate and 0 base fee
+        InventoryPoolParamsMock mockParams = new InventoryPoolParamsMock(
+            0,
+            largeRate,
+            defaultPenaltyRate,
+            defaultPenaltyPeriod
+        );
+
+        // upgrade params on weth inventory pool
+        vm.prank(poolOwner);
+        wethInventoryPool.upgradeParamsContract(mockParams);
+
+        // deposit large amount of ETH
+        deal(WETH, WETH_WHALE, depositAmount);
+        vm.startPrank(WETH_WHALE);
+        WETH_ERC20.approve(address(wethInventoryPool), depositAmount);
+        wethInventoryPool.deposit(depositAmount, WETH_WHALE);
+        vm.stopPrank();
+
+        // addr1 borrows 50 thousand ETH and fast-forwards 1 year
+        vm.prank(poolOwner);
+        wethInventoryPool.borrow(borrowAmount, addr1, addr1, block.timestamp, block.chainid);
+        vm.warp(block.timestamp + 365 days);
+        uint addr1BaseDebt1Year = wethInventoryPool.baseDebt(addr1);
+
+        // addr2 borrows 50 thousand ETH. _updateAccumulatedInterestFactor() executes every hour for 1 year
+        vm.prank(poolOwner);
+        wethInventoryPool.borrow(borrowAmount, addr2, addr2, block.timestamp, block.chainid);
+        uint initialBlockTimestamp = block.timestamp;
+        for (uint i = 0; i < secondsInYear / (1 hours); i++) {
+            vm.warp(block.timestamp + 1 hours);
+            vm.prank(poolOwner);
+            wethInventoryPool.borrow(1, addr3, addr3, block.timestamp, block.chainid);
+        }
+        uint addr2BaseDebt1Year = wethInventoryPool.baseDebt(addr2);
+        uint finalBlockTimestamp = block.timestamp;
+        assertEq(finalBlockTimestamp - initialBlockTimestamp, secondsInYear, "Time difference should be 1 year");
+
+        uint expectedBaseDebt1Year = borrowAmount * RayMath.rayPow(RAY + largeRate, secondsInYear) / RAY; 
+
+        assertApproxEqAbs(
+            addr1BaseDebt1Year,
+            expectedBaseDebt1Year,
+            1,
+            "baseDebt after 1 year should be the principal plus compounded interest"
+        );
+        assertApproxEqAbs(
+            addr1BaseDebt1Year,
+            addr2BaseDebt1Year,
+            10,
+            "baseDebt should not differ based on the number of interest accumulation updates"
+        );
     }
 }

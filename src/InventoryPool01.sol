@@ -8,6 +8,7 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IInventoryPool01} from "./interfaces/IInventoryPool01.sol";
 import {IInventoryPoolParams01} from "./interfaces/IInventoryPoolParams01.sol";
+import {RayMath} from "./utils/RayMath.sol";
 
 /**
  * @title InventoryPool01
@@ -222,9 +223,12 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
         if (storedAccInterestFactor == 0) {
             return RAY;
         } else {
-            // newFactor = oldFactor * (1 + ratePerSecond * secondsSinceLastUpdate)
+            // newFactor = oldFactor * (1 + ratePerSecond)^secondsSinceLastUpdate
             return storedAccInterestFactor.mulDiv(
-                RAY + params.interestRate(_utilizationRate(storedAccInterestFactor)) * (block.timestamp - lastAccumulatedInterestUpdate),
+                RayMath.rayPow(
+                    RAY + params.interestRate(_utilizationRate(storedAccInterestFactor)),
+                    block.timestamp - lastAccumulatedInterestUpdate
+                ),
                 RAY,
                 Math.Rounding.Ceil
             );
