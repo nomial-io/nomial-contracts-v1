@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity ^0.8.0;
 
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+
 library RayMath {
 
     uint256 internal constant RAY = 1e27;
@@ -15,7 +17,7 @@ library RayMath {
     }
 
     function rayMul(uint256 a, uint256 b) internal pure returns (uint256) {
-        return (halfRAY + a * b) / RAY;
+        return Math.mulDiv(a, b, RAY, Math.Rounding.Ceil);
     }
 
     function rayPow(uint256 x, uint256 n) internal pure returns (uint256 z) {

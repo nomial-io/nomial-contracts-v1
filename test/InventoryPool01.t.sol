@@ -805,6 +805,51 @@ contract InventoryPool01Test is Test, Helper {
         vm.stopPrank();
     }
 
+    // Tests that arithmetic overflow occurs after a long period of time (~23 years) at max interest rate (500% annual).
+    // This is an extreme edge case scenario that should never happen in practice
+    function testInventoryPool01_updateAccumulatedInterestFactor_arithmeticOverflowAtMaxInterestRate() public {
+        // Deploy mock params contract with max uint256 for interest rate
+        InventoryPoolParamsMock mockParams = new InventoryPoolParamsMock(
+            defaultBaseFee,
+            type(uint).max, // will be capped to InventoryPoolParams01.MAX_INTEREST_RATE
+            defaultPenaltyRate,
+            defaultPenaltyPeriod
+        );
+
+        // upgrade params on weth inventory pool
+        vm.prank(poolOwner);
+        wethInventoryPool.upgradeParamsContract(mockParams);
+
+        // deposit 1000 ETH
+        vm.prank(WETH_WHALE);
+        wethInventoryPool.deposit(1000 * 10**18, WETH_WHALE);
+
+        // run compound interest update once a year for 22 years
+        uint secondsInYear = 365 * 24 * 60 * 60;
+        uint yrs = 22;
+        for (uint i = 0; i < yrs; i++) {
+            vm.warp(block.timestamp + secondsInYear);
+            vm.prank(poolOwner);
+            wethInventoryPool.borrow(1, addr1, addr1, block.timestamp, block.chainid);
+        }
+
+        // run compount interest update once a day for 385 days,
+        // expect revert after 385 days
+        uint secondsInDay = 24 * 60 * 60;
+        uint numDays = 385;
+        for (uint j = 0; j < numDays + 1; j++) {
+            // fast-forward 1 day
+            vm.warp(block.timestamp + secondsInDay);
+
+            vm.startPrank(poolOwner);
+            if (j == numDays) {
+                vm.expectRevert();
+            }
+            wethInventoryPool.borrow(1, addr1, addr1, block.timestamp, block.chainid);
+            vm.stopPrank();
+        }
+    }
+
     function testInventoryPool01_updateAccumulatedInterestFactor_expectedInterestAmount() public {
         // 50% annual rate (per second)
         // 50n * 10n**25n / (60n * 60n * 24n * 365n);
@@ -870,5 +915,49 @@ contract InventoryPool01Test is Test, Helper {
             10,
             "baseDebt should not differ based on the number of interest accumulation updates"
         );
+    }
+
+    // Tests that interestRate() returns the value from the params contract
+    function testInventoryPool01_interestRate() public {
+        uint depositAmount = 1000 * 10**18;
+        uint borrowAmount = 500 * 10**18;
+
+        vm.prank(WETH_WHALE);
+        wethInventoryPool.deposit(depositAmount, WETH_WHALE);
+
+        vm.prank(poolOwner);
+        wethInventoryPool.borrow(borrowAmount, addr1, addr1, block.timestamp + 1 days, block.chainid);
+
+        uint utilizationRate = wethInventoryPool.utilizationRate();
+        uint expectedRate = wethInventoryPool.params().interestRate(utilizationRate);
+        uint actualRate = wethInventoryPool.interestRate();
+
+        assertEq(actualRate, expectedRate, "Interest rate should match expected rate");
+    }
+
+    // Tests that interestRate() returns MAX_INTEREST_RATE when the rate is too high
+    function testInventoryPool01_interestRate_maxInterestRate() public {
+        // 50,000% annual rate (per second)
+        // 50_000n * 10n**25n / (60n * 60n * 24n * 365n)
+        uint overMaxRate = 15854895991882293252156;
+
+        // 500% annual interest rate (per-second), in RAY (1e27) precision
+        // 500n * 10n**25n / (60n * 60n * 24n * 365n)
+        uint MAX_INTEREST_RATE = 158548959918822932521;
+
+        // Deploy mock params contract with 80% fixed annual rate and 0 base fee
+        InventoryPoolParamsMock mockParams = new InventoryPoolParamsMock(
+            0,
+            overMaxRate,
+            defaultPenaltyRate,
+            defaultPenaltyPeriod
+        );
+
+        // upgrade params on weth inventory pool
+        vm.prank(poolOwner);
+        wethInventoryPool.upgradeParamsContract(mockParams);
+
+        uint rate = wethInventoryPool.interestRate();
+        assertEq(rate, MAX_INTEREST_RATE, "Interest rate should be MAX_INTEREST_RATE");
     }
 }

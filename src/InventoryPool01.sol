@@ -26,6 +26,10 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
     uint constant RAY = 1e27;
     address constant DEAD_ADDRESS = 0x000000000000000000000000000000000000dEaD;
 
+    // 500% annual interest rate (per-second), in RAY (1e27) precision
+    // 500n * 10n**25n / (60n * 60n * 24n * 365n)
+    uint constant MAX_INTEREST_RATE = 158548959918822932521;
+
     /**
      * @dev Represents a borrower's debt position and penalty status
      * @param scaledDebt The borrower's debt amount scaled by the global accumulated interest factor
@@ -226,13 +230,26 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
             // newFactor = oldFactor * (1 + ratePerSecond)^secondsSinceLastUpdate
             return storedAccInterestFactor.mulDiv(
                 RayMath.rayPow(
-                    RAY + params.interestRate(_utilizationRate(storedAccInterestFactor)),
+                    RAY + interestRate(),
                     block.timestamp - lastAccumulatedInterestUpdate
                 ),
                 RAY,
                 Math.Rounding.Ceil
             );
         }
+    }
+
+    /**
+     * @notice Returns the current interest rate for the pool
+     * @dev The maximum interest rate is 1000% annual, represented as a per-second rate in RAY (1e27) precision
+     * @return The interest rate per-second in RAY (1e27) precision
+     */
+    function interestRate() public view returns (uint) {
+        uint rate = params.interestRate(_utilizationRate(storedAccInterestFactor));
+        if (rate > MAX_INTEREST_RATE) {
+            return MAX_INTEREST_RATE;
+        }
+        return rate;
     }
 
     /**
