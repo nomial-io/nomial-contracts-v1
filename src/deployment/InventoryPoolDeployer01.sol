@@ -3,7 +3,6 @@ pragma solidity ^0.8.0;
 
 import {InventoryPool01} from "../InventoryPool01.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {DeployerLib} from "./DeployerLib.sol";
 import {IInventoryPoolDeployer01} from "./interfaces/IInventoryPoolDeployer01.sol";
 
@@ -40,7 +39,7 @@ contract InventoryPoolDeployer01 is IInventoryPoolDeployer01 {
             salt, asset, name, symbol, initAmount, owner, paramsAddr
         );
 
-        SafeERC20.safeTransferFrom(asset, poolFunder, address(this), initAmount);
+        asset.transferFrom(poolFunder, address(this), initAmount);
         asset.approve(expectedAddr, initAmount);
 
         assembly {
