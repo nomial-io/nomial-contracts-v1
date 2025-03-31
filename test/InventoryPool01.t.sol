@@ -360,7 +360,7 @@ contract InventoryPool01Test is Test, Helper {
         vm.stopPrank();
 
         // verify initial penalty counter start time is the same as borrow timestamp
-        (,uint initialPenaltyCounterStart,) = wethInventoryPool.borrowers(addr1);
+        (,uint initialPenaltyCounterStart) = wethInventoryPool.borrowers(addr1);
         assertEq(initialPenaltyCounterStart, TEST_TIMESTAMP, "Penalty counter should be the same as borrow timestamp");
 
         // move forward half of the penalty period to accrue some base debt but no penalty debt
@@ -390,7 +390,7 @@ contract InventoryPool01Test is Test, Helper {
         assertEq(wethInventoryPool.penaltyTime(addr1), 0, "Penalty time should be zero");
 
         // verify time since penaltyCounterStart is half of the time elapsed since borrow
-        (,uint penaltyCounterStart,) = wethInventoryPool.borrowers(addr1);
+        (,uint penaltyCounterStart) = wethInventoryPool.borrowers(addr1);
         uint timeElapsedSinceBorrow = block.timestamp - initialPenaltyCounterStart;
         uint timeSincePenaltyStart = block.timestamp - penaltyCounterStart;
         assertApproxEqAbs(
@@ -417,7 +417,7 @@ contract InventoryPool01Test is Test, Helper {
         vm.stopPrank();
 
         // get initial penalty counter start time
-        (,uint initialPenaltyCounterStart,) = wethInventoryPool.borrowers(addr1);
+        (,uint initialPenaltyCounterStart) = wethInventoryPool.borrowers(addr1);
         assertEq(initialPenaltyCounterStart, TEST_TIMESTAMP, "Penalty counter start should be the same as borrow timestamp");
 
         // Move past penalty period and accrue some penalty debt
@@ -429,6 +429,9 @@ contract InventoryPool01Test is Test, Helper {
 
         // Get initial pool balance
         uint poolInitialBalance = IERC20(WETH).balanceOf(address(wethInventoryPool));
+
+        // Get initial penalty time
+        uint penaltyTimeInitial = wethInventoryPool.penaltyTime(addr1);
 
         // Approve WETH for repayment
         vm.startPrank(addr1);
@@ -448,13 +451,12 @@ contract InventoryPool01Test is Test, Helper {
         uint poolFinalBalance = IERC20(WETH).balanceOf(address(wethInventoryPool));
         assertEq(poolFinalBalance - poolInitialBalance, partialRepayment, "Pool should receive the penalty payment amount");
 
-        // Verify penalty counter start time is unchanged
-        (,uint penaltyCounterStart,) = wethInventoryPool.borrowers(addr1);
-        assertEq(penaltyCounterStart, initialPenaltyCounterStart, "Penalty counter should not have changed");
+        // penalty time after repayment should be half of penalty time before repayment
+        assertEq(wethInventoryPool.penaltyTime(addr1), penaltyTimeInitial / 2, "Penalty time should be half of initial penalty time");
     }
 
-    // Tests repaying all penalty debt plus partial base debt
-    function testInventoryPool01_repay_penaltyAndPartialBaseDebt() public {
+    // Tests exact repayment of penalty debt
+    function testInventoryPool01_repay_penaltyDebtExact() public {
         vm.prank(WETH_WHALE);
         wethInventoryPool.deposit(1_000 * 10**18, poolOwner);
 
@@ -465,7 +467,7 @@ contract InventoryPool01Test is Test, Helper {
         vm.stopPrank();
 
         // get initial penalty counter start time
-        (,uint initialPenaltyCounterStart,) = wethInventoryPool.borrowers(addr1);
+        (,uint initialPenaltyCounterStart) = wethInventoryPool.borrowers(addr1);
         assertEq(initialPenaltyCounterStart, TEST_TIMESTAMP, "Penalty counter start should be the same as borrow timestamp");
 
         // Move past penalty period and accrue some penalty debt
@@ -473,19 +475,80 @@ contract InventoryPool01Test is Test, Helper {
         vm.warp(TEST_TIMESTAMP + penaltyPeriod + 12 hours);
         
         uint penaltyDebt = wethInventoryPool.penaltyDebt(addr1);
+        uint repaymentAmount = penaltyDebt;  // Repay exact amount of penalty debt
+
+        // Get initial pool balance
+        uint poolInitialBalance = IERC20(WETH).balanceOf(address(wethInventoryPool));
+
+        // Get initial penalty time
+        uint penaltyTimeInitial = wethInventoryPool.penaltyTime(addr1);
+
+        // Approve WETH for repayment
+        vm.startPrank(addr1);
+        WETH_ERC20.approve(address(wethInventoryPool), repaymentAmount);
+
+        // Expect penalty repayment event
+        vm.expectEmit(true, false, false, true, address(wethInventoryPool));
+        emit IInventoryPool01.PenaltyRepayment(addr1, penaltyDebt, repaymentAmount);
+        
+        wethInventoryPool.repay(repaymentAmount, addr1);
+        vm.stopPrank();
+
+        // Verify remaining penalty debt is 0
+        assertEq(wethInventoryPool.penaltyDebt(addr1), 0, "Remaining penalty debt should be 0");
+
+        // Verify ERC20 transfer to pool
+        uint poolFinalBalance = IERC20(WETH).balanceOf(address(wethInventoryPool));
+        assertEq(poolFinalBalance - poolInitialBalance, repaymentAmount, "Pool should receive the penalty payment amount");
+
+        // penalty time after repayment should be 0
+        assertEq(wethInventoryPool.penaltyTime(addr1), 0, "Penalty time should be 0");
+
+        // verify time until penalty is 0, meaning we are at the end of the penalty grace period
+        (,uint penaltyCounterStart) = wethInventoryPool.borrowers(addr1);
+        uint timeUntilPenalty = penaltyCounterStart + penaltyPeriod - block.timestamp;
+        assertEq(timeUntilPenalty, 0, "Time until penalty should be 0");
+    }
+
+    // Tests repaying all penalty debt but too little base debt to get out of penalty state
+    function testInventoryPool01_repay_fullPenaltyAndPartialBaseDebt() public {
+        vm.prank(WETH_WHALE);
+        wethInventoryPool.deposit(1_000 * 10**18, poolOwner);
+
+        vm.warp(TEST_TIMESTAMP);
+        
+        vm.startPrank(poolOwner);
+        wethInventoryPool.borrow(100 * 10**18, addr1, addr1, TEST_TIMESTAMP + 1 days, block.chainid);
+        vm.stopPrank();
+
+        // get initial penalty counter start time
+        (,uint initialPenaltyCounterStart) = wethInventoryPool.borrowers(addr1);
+        assertEq(initialPenaltyCounterStart, TEST_TIMESTAMP, "Penalty counter start should be the same as borrow timestamp");
+
+        // Move past penalty period and accrue some penalty debt
+        uint penaltyPeriod = wethInventoryPool.params().penaltyPeriod();
+        vm.warp(TEST_TIMESTAMP + penaltyPeriod + 48 hours);
+        
+        uint penaltyDebt = wethInventoryPool.penaltyDebt(addr1);
         uint baseDebt = wethInventoryPool.baseDebt(addr1);
-        uint totalPayment = penaltyDebt + (baseDebt / 2);  // Pay all penalty debt plus half of base debt
+        uint repaymentAmount = penaltyDebt + (baseDebt / 10);  // Pay all penalty debt plus 10% of base debt
+
+        // penalty time should be 48 hours
+        assertEq(wethInventoryPool.penaltyTime(addr1), 48 hours, "Penalty time should be 48 hours");
+
+        uint expectedPenaltyDebt = (baseDebt * wethInventoryPool.penaltyTime(addr1)).mulDiv(wethInventoryPool.params().penaltyRate(), RAY);
+        assertEq(penaltyDebt, expectedPenaltyDebt, "Penalty debt should be baseDebt * penaltyTime * penaltyRate");
 
         // Transfer WETH to addr1 for repayment
         vm.prank(WETH_WHALE);
-        WETH_ERC20.transfer(addr1, totalPayment);
+        WETH_ERC20.transfer(addr1, repaymentAmount);
 
         // Get initial balances
         uint poolInitialBalance = IERC20(WETH).balanceOf(address(wethInventoryPool));
 
         // Approve WETH for repayment
         vm.startPrank(addr1);
-        WETH_ERC20.approve(address(wethInventoryPool), totalPayment);
+        WETH_ERC20.approve(address(wethInventoryPool), type(uint).max);
 
         // Expect penalty repayment event
         vm.expectEmit(true, false, false, true, address(wethInventoryPool));
@@ -493,37 +556,36 @@ contract InventoryPool01Test is Test, Helper {
         
         // Expect base debt repayment event
         vm.expectEmit(true, false, false, true, address(wethInventoryPool));
-        emit IInventoryPool01.BaseDebtRepayment(addr1, baseDebt, baseDebt / 2);
+        emit IInventoryPool01.BaseDebtRepayment(addr1, baseDebt, baseDebt / 10);
         
-        wethInventoryPool.repay(totalPayment, addr1);
+        wethInventoryPool.repay(repaymentAmount, addr1);
         vm.stopPrank();
 
         // Verify penalty debt is cleared
         assertEq(wethInventoryPool.penaltyDebt(addr1), 0, "No penalty debt should remain");
 
-        // Verify time since penaltyCounterStart is half of the time elapsed since borrow
-        (,uint penaltyCounterStart,) = wethInventoryPool.borrowers(addr1);
-        uint timeElapsedSinceBorrow = block.timestamp - initialPenaltyCounterStart;
-        uint timeSincePenaltyStart = block.timestamp - penaltyCounterStart;
-        assertApproxEqAbs(
-            timeSincePenaltyStart,
-            timeElapsedSinceBorrow / 2,
-            1,
-            "Time since penaltyCounterStart should be half of time elapsed since borrow"
-        );
+        // Verify time until penalty is 10% of the penalty period
+        // because 100% of the penalty debt was paid, which should remove 100% of penalty time for the borrower,
+        // and 10% of the base debt was paid, which should put the borrower in a state where 10% of the penalty grace period remains
+        (,uint penaltyCounterStart) = wethInventoryPool.borrowers(addr1);
+        uint timeUntilPenalty = penaltyCounterStart + penaltyPeriod - block.timestamp;
+        assertApproxEqAbs(timeUntilPenalty, penaltyPeriod / 10, 1, "Time until penalty should be 10% of the penalty period");
 
-        // Verify base debt is partially paid
-        uint expectedRemainingDebt = baseDebt / 2;
+        // Verify penalty time is zero
+        assertEq(wethInventoryPool.penaltyTime(addr1), 0, "Penalty time should be zero");
+
+        // Verify that 90% of the base debt remains
+        uint expectedRemainingDebt = baseDebt * 9 / 10;
         assertApproxEqAbs(
             wethInventoryPool.baseDebt(addr1),
             expectedRemainingDebt,
             1,
-            "Half of base debt should remain"
+            "90% of base debt should remain"
         );
 
         // Verify ERC20 transfer to pool
         uint poolFinalBalance = IERC20(WETH).balanceOf(address(wethInventoryPool));
-        assertEq(poolFinalBalance - poolInitialBalance, totalPayment, "Pool should receive the total payment amount");
+        assertEq(poolFinalBalance - poolInitialBalance, repaymentAmount, "Pool should receive the repayment amount");
     }
 
     // Tests full repayment of both penalty and base debt
@@ -565,7 +627,7 @@ contract InventoryPool01Test is Test, Helper {
         assertEq(wethInventoryPool.penaltyDebt(addr1), 0, "No penalty debt should remain");
         assertEq(wethInventoryPool.baseDebt(addr1), 0, "No base debt should remain");
 
-        (,uint penaltyCounterStart,) = wethInventoryPool.borrowers(addr1);
+        (,uint penaltyCounterStart) = wethInventoryPool.borrowers(addr1);
         assertEq(penaltyCounterStart, 0, "Penalty counter should be reset");
 
         uint poolFinalBalance = IERC20(WETH).balanceOf(address(wethInventoryPool));
@@ -600,7 +662,7 @@ contract InventoryPool01Test is Test, Helper {
 
         assertEq(wethInventoryPool.baseDebt(addr1), 0, "Base debt should be cleared");
 
-        (,uint penaltyCounterStart,) = wethInventoryPool.borrowers(addr1);
+        (,uint penaltyCounterStart) = wethInventoryPool.borrowers(addr1);
         assertEq(penaltyCounterStart, 0, "Penalty counter should be reset");
 
         uint poolFinalBalance = IERC20(WETH).balanceOf(address(wethInventoryPool));
@@ -696,7 +758,7 @@ contract InventoryPool01Test is Test, Helper {
         assertEq(wethInventoryPool.baseDebt(addr1), 0, "Base debt should be cleared");
 
         // Verify penalty counter is reset
-        (,uint penaltyCounterStart,) = wethInventoryPool.borrowers(addr1);
+        (,uint penaltyCounterStart) = wethInventoryPool.borrowers(addr1);
         assertEq(penaltyCounterStart, 0, "Penalty counter should be reset");
 
         // Verify no ERC20 transfer occurred

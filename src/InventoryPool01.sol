@@ -34,13 +34,10 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
      * @dev Represents a borrower's debt position and penalty status
      * @param scaledDebt The borrower's debt amount scaled by the global accumulated interest factor
      * @param penaltyCounterStart The timestamp when the penalty counter started for this borrower. 0 if not in penalty period
-     * @param partialPenaltyPayment The amount of penalty debt that has been partially paid. 0 if not in penalty period, or no
-     * partial payment
      */
     struct Borrower {
         uint scaledDebt;
         uint penaltyCounterStart;
-        uint partialPenaltyPayment;
     }
 
     /// @notice The contract that defines interest rates, fees, and penalty settings for this pool
@@ -113,7 +110,8 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
     /**
      * @notice Repays debt for a borrower
      * @dev Accepts repayment for both base debt and penalty debt. Penalty debt is paid first.
-     * Partial repayments of base debt will proportionally reduce the time until penalties start.
+     * Partial repayments of penalty debt proportionally reduce the penalty time
+     * Partial repayments of base debt proportionally reduce the time until penalties start.
      * @param amount The amount of assets to repay
      * @param borrower The address whose debt is being repaid
      * @custom:revert ZeroRepayment If amount is 0
@@ -277,6 +275,7 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
 
         uint penaltyDebt_ = _penaltyDebt(borrower, storedAccInterestFactor);
         uint penaltyPayment_ = 0;
+        uint newPenaltyCounterStart_ = borrowers[borrower].penaltyCounterStart;
         if (penaltyDebt_ > 0) {
             if (amount > penaltyDebt_) {
                 // payment amount is greater than penalty debt.
@@ -284,14 +283,13 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
                 baseDebtPayment_ = amount - penaltyDebt_;
                 // set penalty payment to full penalty debt amount
                 penaltyPayment_ = penaltyDebt_;
-                // reset partial penalty payment
-                borrowers[borrower].partialPenaltyPayment = 0;
+                // remove all penalty time so that borrower is at the end of the penalty grace period
+                newPenaltyCounterStart_ += penaltyTime(borrower);
             } else {
-                // payment amount is less than penalty debt.
-                // store partial payment amount.
-                // this will be used to calculate the remaining penalty debt.
-                borrowers[borrower].partialPenaltyPayment += amount;
+                // payment amount is less than or equal to penalty debt
                 penaltyPayment_ = amount;
+                // remove penalty time proportionally to the amount of penalty debt repaid
+                newPenaltyCounterStart_ += penaltyTime(borrower).mulDiv(penaltyPayment_, penaltyDebt_);
             }
             emit PenaltyRepayment(borrower, penaltyDebt_, penaltyPayment_);
         } else {
@@ -302,17 +300,14 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
         if (baseDebtPayment_ > 0) {
             if (baseDebtPayment_ >= baseDebt_) {
                 // full repayment of base debt.
-                // reset penalty counter start time.
-                borrowers[borrower].penaltyCounterStart = 0;
+                // clear penalty counter start time.
+                newPenaltyCounterStart_ = 0;
                 // set base debt payment to base debt amount, in case of overpayment
                 baseDebtPayment_ = baseDebt_;
             } else {
                 // partial repayment of base debt.
-                // increase the penalty counter start time based on the amount of base debt repaid.
-                borrowers[borrower].penaltyCounterStart += baseDebtPayment_.mulDiv(
-                    block.timestamp - borrowers[borrower].penaltyCounterStart,
-                    baseDebt_
-                );
+                // decrease time until penalty based on the amount of base debt repaid.
+                newPenaltyCounterStart_ += (block.timestamp - newPenaltyCounterStart_).mulDiv(baseDebtPayment_, baseDebt_);
             }
 
             uint scaledDebt_ = baseDebtPayment_.mulDiv(RAY, storedAccInterestFactor, Math.Rounding.Ceil);
@@ -321,6 +316,9 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
 
             emit BaseDebtRepayment(borrower, baseDebt_, baseDebtPayment_);
         }
+
+        // adjust penalty counter start time
+        borrowers[borrower].penaltyCounterStart = newPenaltyCounterStart_;
 
         if (!forgive) {
             IERC20(asset()).safeTransferFrom(msg.sender, address(this), baseDebtPayment_ + penaltyPayment_);
@@ -418,7 +416,7 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
 
     /**
      * @notice Internal function to calculate the penalty debt for a borrower
-     * @dev Penalty debt = (base debt * penalty time * penalty rate) - penalty debt paid
+     * @dev Penalty debt = base debt * penalty time * penalty rate
      * @param borrower The borrower's address
      * @param accInterestFactor The accumulated interest factor
      * @return The penalty debt amount for the borrower
@@ -427,6 +425,6 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
         uint penaltyTime_ = penaltyTime(borrower);
         if (penaltyTime_ == 0) return 0;
 
-        return (_baseDebt(borrower, accInterestFactor) * penaltyTime_).mulDiv(params.penaltyRate(), RAY) - borrowers[borrower].partialPenaltyPayment;
+        return (_baseDebt(borrower, accInterestFactor) * penaltyTime_).mulDiv(params.penaltyRate(), RAY);
     }
 }
