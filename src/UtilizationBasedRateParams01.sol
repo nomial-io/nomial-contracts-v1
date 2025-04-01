@@ -6,13 +6,13 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {IInventoryPoolParams01} from "./interfaces/IInventoryPoolParams01.sol";
 
 /**
- * @title InventoryPoolParams01
- * @dev Manages the parameters for an InventoryPool. Uses a utilization-based interest rate model
+ * @title UtilizationBasedRateParams01
+ * @dev Manages the parameters for an InventoryPool using a utilization-based interest rate model
  * similar to Aave v3, where the interest rate increases as utilization increases
  * (See https://aave.com/docs/developers/smart-contracts/interest-rate-strategy).
  * All rates are expressed in RAY (1e27) precision.
  */
-contract InventoryPoolParams01 is Ownable, IInventoryPoolParams01 {
+contract UtilizationBasedRateParams01 is Ownable, IInventoryPoolParams01 {
     using Math for uint256;
 
     uint constant RAY = 1e27;

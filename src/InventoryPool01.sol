@@ -134,9 +134,9 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
     }
 
     /**
-     * @notice Updates the InventoryPoolParams01 contract address
+     * @notice Updates the IInventoryPoolParams01 contract address
      * @dev Allows upgrading to a new parameters contract while maintaining the same pool
-     * @param paramsContract The address of the new InventoryPoolParams01 contract
+     * @param paramsContract The address of the new IInventoryPoolParams01 contract
      */
     function upgradeParamsContract(IInventoryPoolParams01 paramsContract) public onlyOwner() {
         if (paramsContract == params) {

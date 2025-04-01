@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity ^0.8.0;
 
-import {InventoryPoolParams01} from "../InventoryPoolParams01.sol";
+import {UtilizationBasedRateParams01} from "../UtilizationBasedRateParams01.sol";
 import {IInventoryPoolParamsDeployer01} from "./interfaces/IInventoryPoolParamsDeployer01.sol";
 import {DeployerLib} from "./DeployerLib.sol";
 
-contract InventoryPoolParamsDeployer01 is IInventoryPoolParamsDeployer01 {
+contract UtilizationBasedRateParamsDeployer01 is IInventoryPoolParamsDeployer01 {
 
     function deployParamsAddress(
         bytes32 salt,
@@ -23,7 +23,7 @@ contract InventoryPoolParamsDeployer01 is IInventoryPoolParamsDeployer01 {
         ) = abi.decode(paramsInitData, (uint, uint, uint, uint, uint, uint, uint));
 
         bytecode = abi.encodePacked(
-            type(InventoryPoolParams01).creationCode,
+            type(UtilizationBasedRateParams01).creationCode,
             abi.encode(
                 owner, baseFee, baseRate, rate1, rate2, 
                 optimalUtilizationRate, penaltyRate, penaltyPeriod

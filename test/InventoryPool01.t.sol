@@ -9,7 +9,7 @@ import "../src/utils/RayMath.sol";
 import {IInventoryPool01} from "../src/interfaces/IInventoryPool01.sol";
 import {IInventoryPoolParams01} from "../src/interfaces/IInventoryPoolParams01.sol";
 import "../src/deployment/InventoryPoolDeployer01.sol";
-import "../src/deployment/InventoryPoolParamsDeployer01.sol";
+import "../src/deployment/UtilizationBasedRateParamsDeployer01.sol";
 import "../src/deployment/NomialDeployer01.sol";
 import "./Helper.sol";
 import "./mocks/InventoryPoolParamsMock.sol";
@@ -18,7 +18,7 @@ contract InventoryPool01Test is Test, Helper {
     using Math for uint256;
 
     InventoryPoolDeployer01 public poolDeployer;
-    InventoryPoolParamsDeployer01 public paramsDeployer;
+    UtilizationBasedRateParamsDeployer01 public paramsDeployer;
     NomialDeployer01 public nomialDeployer;
     InventoryPool01 public usdcInventoryPool;
     InventoryPool01 public wethInventoryPool;
@@ -39,7 +39,7 @@ contract InventoryPool01Test is Test, Helper {
         
         // Deploy the deployers
         poolDeployer = new InventoryPoolDeployer01();
-        paramsDeployer = new InventoryPoolParamsDeployer01();
+        paramsDeployer = new UtilizationBasedRateParamsDeployer01();
         nomialDeployer = new NomialDeployer01(
             address(poolDeployer),
             address(paramsDeployer)
