@@ -10,15 +10,16 @@ import {IInventoryPool01} from "../src/interfaces/IInventoryPool01.sol";
 import {IInventoryPoolParams01} from "../src/interfaces/IInventoryPoolParams01.sol";
 import "../src/deployment/InventoryPoolDeployer01.sol";
 import "../src/deployment/UtilizationBasedRateParamsDeployer01.sol";
+import "../src/deployment/OwnableParamsDeployer01.sol";
 import "../src/deployment/NomialDeployer01.sol";
 import "./Helper.sol";
-import "./mocks/InventoryPoolParamsMock.sol";
 
 contract InventoryPool01Test is Test, Helper {
     using Math for uint256;
 
     InventoryPoolDeployer01 public poolDeployer;
-    UtilizationBasedRateParamsDeployer01 public paramsDeployer;
+    OwnableParamsDeployer01 public ownableParamsDeployer;
+    UtilizationBasedRateParamsDeployer01 public utilizationBasedParamsDeployer;
     NomialDeployer01 public nomialDeployer;
     InventoryPool01 public usdcInventoryPool;
     InventoryPool01 public wethInventoryPool;
@@ -39,10 +40,11 @@ contract InventoryPool01Test is Test, Helper {
         
         // Deploy the deployers
         poolDeployer = new InventoryPoolDeployer01();
-        paramsDeployer = new UtilizationBasedRateParamsDeployer01();
+        ownableParamsDeployer = new OwnableParamsDeployer01();
+        utilizationBasedParamsDeployer = new UtilizationBasedRateParamsDeployer01();
         nomialDeployer = new NomialDeployer01(
             address(poolDeployer),
-            address(paramsDeployer)
+            address(utilizationBasedParamsDeployer)
         );
 
         // Deploy USDC pool
@@ -770,7 +772,7 @@ contract InventoryPool01Test is Test, Helper {
     function testInventoryPool01_upgradeParamsContract() public {
         // Deploy new params contract
         vm.startPrank(poolOwner);
-        address payable newParamsAddress = paramsDeployer.deployParams(
+        address payable newParamsAddress = utilizationBasedParamsDeployer.deployParams(
             salt4,
             poolOwner,
             abi.encode(defaultBaseFee, defaultBaseRate, defaultRate1, defaultRate2, defaultOptimalUtilizationRate, defaultPenaltyRate, defaultPenaltyPeriod)
@@ -792,7 +794,7 @@ contract InventoryPool01Test is Test, Helper {
     function testInventoryPool01_upgradeParamsContract_notOwner() public {
         // Deploy new params contract
         vm.prank(poolOwner);
-        address payable newParamsAddress = paramsDeployer.deployParams(
+        address payable newParamsAddress = utilizationBasedParamsDeployer.deployParams(
             salt4,
             poolOwner,
             abi.encode(defaultBaseFee, defaultBaseRate, defaultRate1, defaultRate2, defaultOptimalUtilizationRate, defaultPenaltyRate, defaultPenaltyPeriod)
@@ -838,13 +840,10 @@ contract InventoryPool01Test is Test, Helper {
         // 50 thousand ETH
         uint borrowAmount = 50_000 * 10**18;
 
-        // Deploy mock params contract with large but reasonable interest rate
-        InventoryPoolParamsMock mockParams = new InventoryPoolParamsMock(
-            defaultBaseFee,
-            largeRate,
-            defaultPenaltyRate,
-            defaultPenaltyPeriod
-        );
+        // Deploy params with large but reasonable interest rate
+        IInventoryPoolParams01 mockParams = IInventoryPoolParams01(ownableParamsDeployer.deployParams(
+            0, poolOwner, abi.encode(defaultBaseFee, largeRate, defaultPenaltyRate, defaultPenaltyPeriod)
+        ));
 
         // upgrade params on weth inventory pool
         vm.prank(poolOwner);
@@ -870,13 +869,17 @@ contract InventoryPool01Test is Test, Helper {
     // Tests that arithmetic overflow occurs after a long period of time (~23 years) at max interest rate (500% annual).
     // This is an extreme edge case scenario that should never happen in practice
     function testInventoryPool01_updateAccumulatedInterestFactor_arithmeticOverflowAtMaxInterestRate() public {
-        // Deploy mock params contract with max uint256 for interest rate
-        InventoryPoolParamsMock mockParams = new InventoryPoolParamsMock(
-            defaultBaseFee,
-            type(uint).max, // will be capped to InventoryPoolParams01.MAX_INTEREST_RATE
-            defaultPenaltyRate,
-            defaultPenaltyPeriod
-        );
+        // Deploy params contract with max uint256 for interest rate
+        IInventoryPoolParams01 mockParams = IInventoryPoolParams01(ownableParamsDeployer.deployParams(
+            0,
+            poolOwner,
+            abi.encode(
+                defaultBaseFee,
+                type(uint).max, // will be capped to InventoryPoolParams01.MAX_INTEREST_RATE
+                defaultPenaltyRate,
+                defaultPenaltyPeriod
+            )
+        ));
 
         // upgrade params on weth inventory pool
         vm.prank(poolOwner);
@@ -925,13 +928,10 @@ contract InventoryPool01Test is Test, Helper {
 
         uint secondsInYear = 365 * 24 * 60 * 60;
         
-        // Deploy mock params contract with 80% fixed annual rate and 0 base fee
-        InventoryPoolParamsMock mockParams = new InventoryPoolParamsMock(
-            0,
-            largeRate,
-            defaultPenaltyRate,
-            defaultPenaltyPeriod
-        );
+        // Deploy params contract with 80% fixed annual rate and 0 base fee
+        IInventoryPoolParams01 mockParams = IInventoryPoolParams01(ownableParamsDeployer.deployParams(
+            0, poolOwner, abi.encode(0, largeRate, defaultPenaltyRate, defaultPenaltyPeriod)
+        ));
 
         // upgrade params on weth inventory pool
         vm.prank(poolOwner);
@@ -1007,13 +1007,10 @@ contract InventoryPool01Test is Test, Helper {
         // 500n * 10n**25n / (60n * 60n * 24n * 365n)
         uint MAX_INTEREST_RATE = 158548959918822932521;
 
-        // Deploy mock params contract with 80% fixed annual rate and 0 base fee
-        InventoryPoolParamsMock mockParams = new InventoryPoolParamsMock(
-            0,
-            overMaxRate,
-            defaultPenaltyRate,
-            defaultPenaltyPeriod
-        );
+        // Deploy params contract with rate over the max rate and 0 base fee
+        IInventoryPoolParams01 mockParams = IInventoryPoolParams01(ownableParamsDeployer.deployParams(
+            0, poolOwner, abi.encode(0, overMaxRate, defaultPenaltyRate, defaultPenaltyPeriod)
+        ));
 
         // upgrade params on weth inventory pool
         vm.prank(poolOwner);
