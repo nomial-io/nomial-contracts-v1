@@ -3,6 +3,7 @@ pragma solidity ^0.8.0;
 
 import {Test} from "forge-std/Test.sol";
 import {console} from "forge-std/console.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {UtilizationBasedRateParams01} from "../src/UtilizationBasedRateParams01.sol";
 import {IInventoryPoolParams01} from "../src/interfaces/IInventoryPoolParams01.sol";
 import "./Helper.sol";
@@ -13,8 +14,14 @@ contract UtilizationBasedRateParams01Test is Test, Helper {
 
     uint constant RAY = 1e27;
 
+    event ParamsUpdated(uint baseFee, uint baseRate, uint rate1, uint rate2, uint optimalUtilizationRate, uint penaltyRate, uint penaltyPeriod);
+
     function setUp() public {
         setupAll();
+
+        vm.expectEmit();
+        emit ParamsUpdated(defaultBaseFee, defaultBaseRate, defaultRate1, defaultRate2, defaultOptimalUtilizationRate, defaultPenaltyRate, defaultPenaltyPeriod);
+
         params = new UtilizationBasedRateParams01(
             owner,
             defaultBaseFee,
@@ -94,5 +101,21 @@ contract UtilizationBasedRateParams01Test is Test, Helper {
         uint interestRate = params.interestRate(RAY);
         uint expectedRate = defaultBaseRate + defaultRate1 + defaultRate2;
         assertEq(interestRate, expectedRate, "Interest rate at 100% utilization should be baseRate + rate1 + rate2");
+    }
+
+    // Test updateParams emits event
+    function testUtilizationBasedRateParams01_updateParams_emitsEvent() public {
+        vm.expectEmit();
+        emit ParamsUpdated(defaultBaseFee+1, defaultBaseRate+1, defaultRate1+1, defaultRate2+1, defaultOptimalUtilizationRate+1, defaultPenaltyRate+1, defaultPenaltyPeriod+1);
+
+        vm.prank(owner);
+        params.updateParams(defaultBaseFee+1, defaultBaseRate+1, defaultRate1+1, defaultRate2+1, defaultOptimalUtilizationRate+1, defaultPenaltyRate+1, defaultPenaltyPeriod+1);
+    }
+
+    // Test updateParams is only callable by owner
+    function testUtilizationBasedRateParams01_updateParams_onlyOwner() public {
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, address(1)));
+        vm.prank(address(1));
+        params.updateParams(defaultBaseFee+1, defaultBaseRate+1, defaultRate1+1, defaultRate2+1, defaultOptimalUtilizationRate+1, defaultPenaltyRate+1, defaultPenaltyPeriod+1);
     }
 } 
