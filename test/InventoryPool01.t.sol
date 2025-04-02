@@ -1046,4 +1046,71 @@ contract InventoryPool01Test is Test, Helper {
         uint rate = wethInventoryPool.interestRate();
         assertEq(rate, MAX_INTEREST_RATE, "Interest rate should be MAX_INTEREST_RATE");
     }
+
+    // Tests that overwriteCoreState correctly modifies core state variables and can recover
+    // from unexpected arithmetic overflow pool state
+    function testInventoryPool01_overwriteCoreState() public {
+        // 80% annual rate (per second)
+        // 80n * 10n**16n / (60n * 60n * 24n * 365n);
+        uint largeRate = 25367833587;
+
+        // 500 billion ETH
+        uint depositAmount = 500_000_000_000 * 10**18;
+
+        // 50 thousand ETH
+        uint borrowAmount = 50_000 * 10**18;
+
+        // Deploy params with large but reasonable interest rate
+        IInventoryPoolParams01 mockParams = IInventoryPoolParams01(ownableParamsDeployer.deployParams(
+            0, poolOwner, abi.encode(defaultBaseFee, largeRate, defaultPenaltyRate, defaultPenaltyPeriod)
+        ));
+
+        // upgrade params on weth inventory pool
+        vm.prank(poolOwner);
+        wethInventoryPool.upgradeParamsContract(mockParams);
+
+        // deposit large amount of ETH
+        deal(WETH, WETH_WHALE, depositAmount);
+        vm.startPrank(WETH_WHALE);
+        WETH_ERC20.approve(address(wethInventoryPool), depositAmount);
+        wethInventoryPool.deposit(depositAmount, WETH_WHALE);
+        vm.stopPrank();
+
+        // borrow 50 thousand ETH and fast-forward 8 years
+        vm.prank(poolOwner);
+        wethInventoryPool.borrow(borrowAmount, addr1, addr1, block.timestamp, block.chainid);
+        vm.warp(block.timestamp + 8 * 365 days);
+
+        // try to withdraw a small amount, which works without overflow
+        vm.prank(WETH_WHALE);
+        wethInventoryPool.withdraw(1e18, WETH_WHALE, WETH_WHALE);
+
+        // fast-forward another 9 years
+        vm.warp(block.timestamp + 9 * 365 days);
+
+        // the pool is now in a state where the compound interest calculation causes arithmetic overflow
+        // because the exponent (9 years, in seconds) is too large for wadPow. This is an extreme edge case
+        // that can only happen if there are no interactions with the pool for 9 years.
+        vm.prank(WETH_WHALE);
+        vm.expectRevert();
+        wethInventoryPool.withdraw(1e18, WETH_WHALE, WETH_WHALE);
+
+        // recover from this state by overwriting the core state variables
+        vm.prank(poolOwner);
+        wethInventoryPool.overwriteCoreState(0, 0, 0);
+
+        // withdraw should now work without overflow
+        uint initialBalance = WETH_ERC20.balanceOf(WETH_WHALE);
+        vm.prank(WETH_WHALE);
+        wethInventoryPool.withdraw(1e18, WETH_WHALE, WETH_WHALE);
+        uint finalBalance = WETH_ERC20.balanceOf(WETH_WHALE);
+        assertEq(finalBalance - initialBalance, 1e18, "Withdrawal should be successful");
+    }
+
+    // Tests that non-owner cannot call overwriteCoreState
+    function testInventoryPool01_overwriteCoreState_nonOwner() public {
+        vm.prank(address(1));
+        vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", address(1)));
+        wethInventoryPool.overwriteCoreState(0, 0, 0);
+    }
 }

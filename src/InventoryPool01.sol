@@ -149,6 +149,24 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
     }
 
     /**
+     * @notice Overwrites core state of the pool
+     * @dev Only callable by owner. This is an emergency function that allows the pool to be recovered
+     * from an unexpected state, such as accumulated interest factor arithmetic overflow.
+     * @param newStoredAccInterestFactor The new value for storedAccInterestFactor
+     * @param newLastAccumulatedInterestUpdate The new timestamp for lastAccumulatedInterestUpdate
+     * @param newScaledReceivables The new value for scaledReceivables
+     */
+    function overwriteCoreState(
+        uint newStoredAccInterestFactor,
+        uint newLastAccumulatedInterestUpdate,
+        uint newScaledReceivables
+    ) public onlyOwner() {
+        storedAccInterestFactor = newStoredAccInterestFactor;
+        lastAccumulatedInterestUpdate = newLastAccumulatedInterestUpdate;
+        scaledReceivables = newScaledReceivables;
+    }
+
+    /**
      * @notice Returns the total assets managed by this pool
      * @dev Includes both the actual balance and all outstanding receivables
      * @return The total assets in the pool
