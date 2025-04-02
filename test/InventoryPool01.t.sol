@@ -196,6 +196,33 @@ contract InventoryPool01Test is Test, Helper {
         assertEq(newBaseDebt, expectedDebt, "Base debt should reflect 1 hour of compounded interest");
     }
 
+    // Verifies interest accumulation for borrowed position with small decimal token
+    // such as USDC which uses 1e6 decimals
+    function testInventoryPool01_borrow_accumulatedInterest_smallDecimalToken() public {
+        vm.startPrank(USDC_WHALE);
+        USDC_ERC20.approve(address(usdcInventoryPool), MAX_UINT);
+        usdcInventoryPool.deposit(1_000 * 10**6, addr1);
+        vm.stopPrank();
+
+        uint borrowAmount = 100 * 10**6;
+        vm.warp(TEST_TIMESTAMP);
+        
+        vm.startPrank(poolOwner);
+        usdcInventoryPool.borrow(borrowAmount, addr1, addr2, TEST_TIMESTAMP + 1 days, block.chainid);
+        vm.stopPrank();
+
+        uint initialBaseDebt = usdcInventoryPool.baseDebt(addr1);
+        uint utilizationRate = usdcInventoryPool.utilizationRate();
+        uint interestRate = usdcInventoryPool.params().interestRate(utilizationRate);
+        
+        vm.warp(TEST_TIMESTAMP + 1 hours);
+        
+        uint newBaseDebt = usdcInventoryPool.baseDebt(addr1);
+        uint expectedDebt = initialBaseDebt * WadMath.wadPow(WAD + interestRate, 1 hours) / WAD;
+        assertEq(newBaseDebt, expectedDebt, "Base debt should reflect 1 hour of compounded interest");
+        assertEq(newBaseDebt - initialBaseDebt, 142, "compounded interest should be non-zero for small decimal token");
+    }
+
     // Verifies penalty debt calculation after penalty period
     function testInventoryPool01_borrow_penaltyAfterPeriod() public {
         vm.prank(WETH_WHALE);
