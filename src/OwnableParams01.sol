@@ -9,16 +9,16 @@ import {IInventoryPoolParams01} from "./interfaces/IInventoryPoolParams01.sol";
  * @dev A parameter management contract for inventory pools that implements IInventoryPoolParams01
  * and inherits OpenZeppelin's Ownable for access control. This contract provides fixed parameters
  * that can be updated by the owner, including base fee, interest rate, penalty rate, and penalty period.
- * All rates are expressed in RAY (1e27) precision.
+ * All rates are expressed in WAD (1e18) precision.
  */
 contract OwnableParams01 is IInventoryPoolParams01, Ownable {
-    /** @dev The base fee charged on new borrows, stored in RAY (1e27) precision */
+    /** @dev The base fee charged on new borrows, stored in WAD (1e18) precision */
     uint private _baseFee;
 
-    /** @dev The fixed interest rate per second for loans, stored in RAY (1e27) precision */
+    /** @dev The fixed interest rate per second for loans, stored in WAD (1e18) precision */
     uint private _interestRate;
 
-    /** @dev The penalty interest rate per second charged on overdue loans, stored in RAY (1e27) precision */
+    /** @dev The penalty interest rate per second charged on overdue loans, stored in WAD (1e18) precision */
     uint private _penaltyRate;
 
     /** @dev The grace period before penalties apply (in seconds) */
@@ -51,9 +51,9 @@ contract OwnableParams01 is IInventoryPoolParams01, Ownable {
     /**
      * @notice Initializes the contract with initial parameter values and owner
      * @dev Sets up all parameters and emits events for initial values
-     * @param baseFee_ Initial base fee value, in RAY (1e27) precision
-     * @param interestRate_ Initial interest rate value, in RAY (1e27) precision
-     * @param penaltyRate_ Initial penalty rate value, in RAY (1e27) precision
+     * @param baseFee_ Initial base fee value, in WAD (1e18) precision
+     * @param interestRate_ Initial interest rate value, in WAD (1e18) precision
+     * @param penaltyRate_ Initial penalty rate value, in WAD (1e18) precision
      * @param penaltyPeriod_ Initial penalty period value, in seconds
      * @param owner Address that will be granted ownership of the contract
      */
@@ -78,7 +78,7 @@ contract OwnableParams01 is IInventoryPoolParams01, Ownable {
     /**
      * @notice Returns the current base fee
      * @dev The base fee is charged upfront when a new borrow is created
-     * @return The base fee value in RAY (1e27) precision
+     * @return The base fee value in WAD (1e18) precision
      */
     function baseFee() external view returns (uint) {
         return _baseFee;
@@ -88,7 +88,7 @@ contract OwnableParams01 is IInventoryPoolParams01, Ownable {
      * @notice Returns the current interest rate
      * @dev The interest rate accrues debt based on the time a borrower holds a loan
      * @param utilizationRate The utilization rate for the inventory pool (unused in this implementation)
-     * @return The interest rate per second in RAY (1e27) precision
+     * @return The interest rate per second in WAD (1e18) precision
      */
     function interestRate(uint utilizationRate) external view returns (uint) {
         return _interestRate;
@@ -97,8 +97,8 @@ contract OwnableParams01 is IInventoryPoolParams01, Ownable {
     /**
      * @notice Returns the current penalty rate
      * @dev The penalty rate is added on top of the regular interest rate when a loan
-     * exceeds the penalty period. Penalty rate is persecond in RAY (1e27) precision
-     * @return The penalty rate per second in RAY (1e27) precision
+     * exceeds the penalty period. Penalty rate is persecond in WAD (1e18) precision
+     * @return The penalty rate per second in WAD (1e18) precision
      */
     function penaltyRate() external view returns (uint) {
         return _penaltyRate;
@@ -117,7 +117,7 @@ contract OwnableParams01 is IInventoryPoolParams01, Ownable {
     /**
      * @notice Updates the base fee to a new value
      * @dev Only callable by the contract owner
-     * @param newBaseFee The new base fee value in RAY (1e27) precision
+     * @param newBaseFee The new base fee value in WAD (1e18) precision
      */
     function updateBaseFee(uint newBaseFee) external onlyOwner {
         emit BaseFeeUpdated(_baseFee, newBaseFee);
@@ -127,7 +127,7 @@ contract OwnableParams01 is IInventoryPoolParams01, Ownable {
     /**
      * @notice Updates the interest rate to a new value
      * @dev Only callable by the contract owner
-     * @param newInterestRate The new interest rate value in RAY (1e27) precision
+     * @param newInterestRate The new interest rate value in WAD (1e18) precision
      */
     function updateInterestRate(uint newInterestRate) external onlyOwner {
         emit InterestRateUpdated(_interestRate, newInterestRate);
@@ -137,7 +137,7 @@ contract OwnableParams01 is IInventoryPoolParams01, Ownable {
     /**
      * @notice Updates the penalty rate to a new value
      * @dev Only callable by the contract owner
-     * @param newPenaltyRate The new penalty rate value in RAY (1e27) precision
+     * @param newPenaltyRate The new penalty rate value in WAD (1e18) precision
      */
     function updatePenaltyRate(uint newPenaltyRate) external onlyOwner {
         emit PenaltyRateUpdated(_penaltyRate, newPenaltyRate);

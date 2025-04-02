@@ -12,7 +12,7 @@ contract OwnableParams01Test is Test, Helper {
 
     uint defaultInterestRate = defaultRate1;
 
-    uint constant RAY = 1e27;
+    uint constant WAD = 1e18;
 
     event BaseFeeUpdated(uint oldBaseFee, uint newBaseFee);
     event InterestRateUpdated(uint oldInterestRate, uint newInterestRate);
@@ -130,8 +130,8 @@ contract OwnableParams01Test is Test, Helper {
     function testOwnableParams01_interestRate_ignoresUtilization() public {
         // Interest rate should be constant regardless of utilization
         uint rate1 = params.interestRate(0);
-        uint rate2 = params.interestRate(RAY / 2); // 50% utilization
-        uint rate3 = params.interestRate(RAY);     // 100% utilization
+        uint rate2 = params.interestRate(WAD / 2); // 50% utilization
+        uint rate3 = params.interestRate(WAD);     // 100% utilization
         
         assertEq(rate1, rate2, "Interest rate should be constant");
         assertEq(rate2, rate3, "Interest rate should be constant");

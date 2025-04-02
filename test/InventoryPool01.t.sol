@@ -5,7 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {console} from "forge-std/console.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import "../src/InventoryPool01.sol";
-import "../src/utils/RayMath.sol";
+import "../src/utils/WadMath.sol";
 import {IInventoryPool01} from "../src/interfaces/IInventoryPool01.sol";
 import {IInventoryPoolParams01} from "../src/interfaces/IInventoryPoolParams01.sol";
 import "../src/deployment/InventoryPoolDeployer01.sol";
@@ -33,7 +33,7 @@ contract InventoryPool01Test is Test, Helper {
     bytes32 public constant salt3 = hex'ed0461bb6636b9669060a1f83779bb5d660330b2a2cd0d04dd3c22533b24aae3';
     bytes32 public constant salt4 = hex'3b9eaf8ca13209dab364d64ca37e15568026112dda9f5dd8d3519338ae882fd7';
 
-    uint constant RAY = 1e27;
+    uint constant WAD = 1e18;
 
     function setUp() public {
         setupAll();
@@ -164,7 +164,7 @@ contract InventoryPool01Test is Test, Helper {
         vm.stopPrank();
 
         uint baseDebt = wethInventoryPool.baseDebt(addr1);
-        uint expectedDebt = borrowAmount + (borrowAmount * baseFee) / RAY;
+        uint expectedDebt = borrowAmount + (borrowAmount * baseFee) / WAD;
         assertEq(baseDebt, expectedDebt, "Base debt should equal borrow amount plus base fee");
 
         uint penaltyTime = wethInventoryPool.penaltyTime(addr1);
@@ -192,7 +192,7 @@ contract InventoryPool01Test is Test, Helper {
         vm.warp(TEST_TIMESTAMP + 1 hours);
         
         uint newBaseDebt = wethInventoryPool.baseDebt(addr1);
-        uint expectedDebt = initialBaseDebt * RayMath.rayPow(RAY + interestRate, 1 hours) / RAY;
+        uint expectedDebt = initialBaseDebt * WadMath.wadPow(WAD + interestRate, 1 hours) / WAD;
         assertEq(newBaseDebt, expectedDebt, "Base debt should reflect 1 hour of compounded interest");
     }
 
@@ -218,7 +218,7 @@ contract InventoryPool01Test is Test, Helper {
 
         uint penaltyDebt = wethInventoryPool.penaltyDebt(addr1);
         uint baseDebt = wethInventoryPool.baseDebt(addr1);
-        uint expectedPenaltyDebt = (baseDebt * penaltyRate * 12 hours) / RAY;
+        uint expectedPenaltyDebt = (baseDebt * penaltyRate * 12 hours) / WAD;
         assertEq(penaltyDebt, expectedPenaltyDebt, "Penalty debt should accumulate at penalty rate");
     }
 
@@ -300,7 +300,7 @@ contract InventoryPool01Test is Test, Helper {
         vm.warp(TEST_TIMESTAMP + 1 hours);
         
         uint addr1Debt = wethInventoryPool.baseDebt(addr1);
-        uint addr1ExpectedDebt = addr1InitialDebt * RayMath.rayPow(RAY + interestRate1, 1 hours) / RAY;
+        uint addr1ExpectedDebt = addr1InitialDebt * WadMath.wadPow(WAD + interestRate1, 1 hours) / WAD;
         assertEq(addr1Debt, addr1ExpectedDebt, "Expected debt after 1 hour at interestRate1 should match");
 
         // Large borrow to increase utilization and interestRate
@@ -320,13 +320,13 @@ contract InventoryPool01Test is Test, Helper {
 
         // Check borrower 1 debt reflects both interest rate periods
         addr1Debt = wethInventoryPool.baseDebt(addr1);
-        addr1ExpectedDebt = addr1ExpectedDebt * RayMath.rayPow(RAY + interestRate2, 1 hours) / RAY;
-        assertEq(addr1Debt, addr1ExpectedDebt, "First borrower should reflect both interest rate periods");
+        addr1ExpectedDebt = addr1ExpectedDebt * WadMath.wadPow(WAD + interestRate2, 1 hours) / WAD;
+        assertApproxEqAbs(addr1Debt, addr1ExpectedDebt, 10, "First borrower should reflect both interest rate periods");
 
         // Check borrower 2 debt reflects only the higher rate
         uint addr2Debt = wethInventoryPool.baseDebt(addr2);
-        uint addr2ExpectedDebt = addr2InitialDebt * RayMath.rayPow(RAY + interestRate2, 1 hours) / RAY;
-        assertEq(addr2Debt, addr2ExpectedDebt, "Second borrower should reflect only the higher interest rate period");
+        uint addr2ExpectedDebt = addr2InitialDebt * WadMath.wadPow(WAD + interestRate2, 1 hours) / WAD;
+        assertApproxEqAbs(addr2Debt, addr2ExpectedDebt, 10, "Second borrower should reflect only the higher interest rate period");
     }
 
     // Verifies repay fails with zero amount
@@ -538,7 +538,7 @@ contract InventoryPool01Test is Test, Helper {
         // penalty time should be 48 hours
         assertEq(wethInventoryPool.penaltyTime(addr1), 48 hours, "Penalty time should be 48 hours");
 
-        uint expectedPenaltyDebt = (baseDebt * wethInventoryPool.penaltyTime(addr1)).mulDiv(wethInventoryPool.params().penaltyRate(), RAY);
+        uint expectedPenaltyDebt = (baseDebt * wethInventoryPool.penaltyTime(addr1)).mulDiv(wethInventoryPool.params().penaltyRate(), WAD);
         assertEq(penaltyDebt, expectedPenaltyDebt, "Penalty debt should be baseDebt * penaltyTime * penaltyRate");
 
         // Transfer WETH to addr1 for repayment
@@ -831,8 +831,8 @@ contract InventoryPool01Test is Test, Helper {
     // Tests that reasonable values cannot cause arithmetic overflow
     function testInventoryPool01_updateAccumulatedInterestFactor_noArithmeticOverflowForReasonableValues() public {
         // 80% annual rate (per second)
-        // 80n * 10n**25n / (60n * 60n * 24n * 365n);
-        uint largeRate = 25367833587011669203;
+        // 80n * 10n**16n / (60n * 60n * 24n * 365n);
+        uint largeRate = 25367833587;
 
         // 500 billion ETH
         uint depositAmount = 500_000_000_000 * 10**18;
@@ -898,10 +898,10 @@ contract InventoryPool01Test is Test, Helper {
             wethInventoryPool.borrow(1, addr1, addr1, block.timestamp, block.chainid);
         }
 
-        // run compount interest update once a day for 385 days,
-        // expect revert after 385 days
+        // run compount interest update once a day for 1,897 days (~5 years),
+        // expect revert after 1,897 days
         uint secondsInDay = 24 * 60 * 60;
-        uint numDays = 385;
+        uint numDays = 1_897;
         for (uint j = 0; j < numDays + 1; j++) {
             // fast-forward 1 day
             vm.warp(block.timestamp + secondsInDay);
@@ -917,8 +917,8 @@ contract InventoryPool01Test is Test, Helper {
 
     function testInventoryPool01_updateAccumulatedInterestFactor_expectedInterestAmount() public {
         // 50% annual rate (per second)
-        // 50n * 10n**25n / (60n * 60n * 24n * 365n);
-        uint largeRate = 15854895991882293252;
+        // 50n * 10n**16n / (60n * 60n * 24n * 365n);
+        uint largeRate = 15854895991;
 
         // 500 billion ETH
         uint depositAmount = 500_000_000_000 * 10**18;
@@ -963,7 +963,7 @@ contract InventoryPool01Test is Test, Helper {
         uint finalBlockTimestamp = block.timestamp;
         assertEq(finalBlockTimestamp - initialBlockTimestamp, secondsInYear, "Time difference should be 1 year");
 
-        uint expectedBaseDebt1Year = borrowAmount * RayMath.rayPow(RAY + largeRate, secondsInYear) / RAY; 
+        uint expectedBaseDebt1Year = borrowAmount * WadMath.wadPow(WAD + largeRate, secondsInYear) / WAD; 
 
         assertApproxEqAbs(
             addr1BaseDebt1Year,
@@ -974,8 +974,8 @@ contract InventoryPool01Test is Test, Helper {
         assertApproxEqAbs(
             addr1BaseDebt1Year,
             addr2BaseDebt1Year,
-            10,
-            "baseDebt should not differ based on the number of interest accumulation updates"
+            1e9, // should not be off by more than 0.000000001 ETH
+            "baseDebt should not differ significantly based on the number of interest accumulation updates"
         );
     }
 
@@ -1000,12 +1000,12 @@ contract InventoryPool01Test is Test, Helper {
     // Tests that interestRate() returns MAX_INTEREST_RATE when the rate is too high
     function testInventoryPool01_interestRate_maxInterestRate() public {
         // 50,000% annual rate (per second)
-        // 50_000n * 10n**25n / (60n * 60n * 24n * 365n)
-        uint overMaxRate = 15854895991882293252156;
+        // 50_000n * 10n**16n / (60n * 60n * 24n * 365n)
+        uint overMaxRate = 15854895991882;
 
-        // 500% annual interest rate (per-second), in RAY (1e27) precision
-        // 500n * 10n**25n / (60n * 60n * 24n * 365n)
-        uint MAX_INTEREST_RATE = 158548959918822932521;
+        // 500% annual interest rate (per-second), in WAD (1e18) precision
+        // 500n * 10n**16n / (60n * 60n * 24n * 365n)
+        uint MAX_INTEREST_RATE = 158548959918;
 
         // Deploy params contract with rate over the max rate and 0 base fee
         IInventoryPoolParams01 mockParams = IInventoryPoolParams01(ownableParamsDeployer.deployParams(

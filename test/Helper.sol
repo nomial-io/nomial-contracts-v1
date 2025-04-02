@@ -29,7 +29,7 @@ contract Helper is Test {
     uint public MAX_UINT = 115792089237316195423570985008687907853269984665640564039457584007913129639935;
 
     // 1 bps (0.01 %)
-    uint public defaultBaseFee = 1 * 1e23;
+    uint public defaultBaseFee = 1 * 1e14;
 
     // utilization-based interest rate params, modeled from Aave V3's USDC pool
 
@@ -37,20 +37,20 @@ contract Helper is Test {
     uint public defaultBaseRate = 0;
 
     // 10% annual rate1 (per-second)
-    // 10n * 10n**25n / (60n * 60n * 24n * 365n)
-    uint public defaultRate1 = 3170979198376458650;
+    // 10n * 10n**16n / (60n * 60n * 24n * 365n)
+    uint public defaultRate1 = 3170979198;
 
     // 100% annual rate2 (per-second)
-    // 100n * 10n**25n / (60n * 60n * 24n * 365n)
-    uint public defaultRate2 = 31709791983764586504;
+    // 100n * 10n**16n / (60n * 60n * 24n * 365n)
+    uint public defaultRate2 = 31709791983;
 
     // 80% optimal utilization rate
-    // 80n * 10n**25n
-    uint public defaultOptimalUtilizationRate = 800000000000000000000000000;
+    // 80n * 10n**16n
+    uint public defaultOptimalUtilizationRate = 800000000000000000;
 
     // 500% annual penalty rate, per second
-    // 500n * 10n**25n / (60n * 60n * 24n * 365n)
-    uint public defaultPenaltyRate = 158548959918822932521;
+    // 500n * 10n**16n / (60n * 60n * 24n * 365n)
+    uint public defaultPenaltyRate = 158548959918;
 
     // 24 hour penalty period, in seconds
     uint public defaultPenaltyPeriod = 86400;
