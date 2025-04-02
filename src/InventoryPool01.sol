@@ -8,7 +8,7 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IInventoryPool01} from "./interfaces/IInventoryPool01.sol";
 import {IInventoryPoolParams01} from "./interfaces/IInventoryPoolParams01.sol";
-import {RayMath} from "./utils/RayMath.sol";
+import {WadMath} from "./utils/WadMath.sol";
 
 /**
  * @title InventoryPool01
@@ -17,18 +17,18 @@ import {RayMath} from "./utils/RayMath.sol";
  * - Variable interest rates based on pool utilization
  * - Penalty interest for overdue loans
  * - Repayment of both base debt and penalty debt
- * All rates and calculations use RAY (1e27) precision for accurate interest accrual
+ * All rates and calculations use WAD (1e18) precision
  */
 contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardTransient {
     using Math for uint256;
     using SafeERC20 for IERC20;
 
-    uint constant RAY = 1e27;
+    uint constant WAD = 1e18;
     address constant DEAD_ADDRESS = 0x000000000000000000000000000000000000dEaD;
 
-    // 500% annual interest rate (per-second), in RAY (1e27) precision
-    // 500n * 10n**25n / (60n * 60n * 24n * 365n)
-    uint constant MAX_INTEREST_RATE = 158548959918822932521;
+    // 500% annual interest rate (per-second), in WAD (1e18) precision
+    // 500n * 10n**16n / (60n * 60n * 24n * 365n)
+    uint constant MAX_INTEREST_RATE = 158548959918;
 
     /**
      * @dev Represents a borrower's debt position and penalty status
@@ -43,7 +43,7 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
     /// @notice The contract that defines interest rates, fees, and penalty settings for this pool
     IInventoryPoolParams01 public params;
 
-    /// @notice The global accumulated interest factor used for debt scaling, stored in RAY (1e27) precision
+    /// @notice The global accumulated interest factor used for debt scaling, stored in WAD (1e18) precision
     /// @dev Although this is public, it is not recommended to read it directly. Instead use the `accumulatedInterestFactor()`
     /// function which will calculate the interest factor based on the current time and the last update timestamp.
     uint public storedAccInterestFactor;
@@ -95,7 +95,7 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
 
         _updateAccumulatedInterestFactor();
 
-        uint scaledDebt_ = amount.mulDiv(RAY, storedAccInterestFactor, Math.Rounding.Ceil) + amount.mulDiv(params.baseFee(), RAY, Math.Rounding.Ceil);
+        uint scaledDebt_ = amount.mulDiv(WAD, storedAccInterestFactor, Math.Rounding.Ceil) + amount.mulDiv(params.baseFee(), WAD, Math.Rounding.Ceil);
         borrowers[borrower].scaledDebt += scaledDebt_;
         scaledReceivables += scaledDebt_;
         if (borrowers[borrower].penaltyCounterStart == 0) {
@@ -169,12 +169,12 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
     /**
      * @notice Calculates the current utilization rate of the pool
      * @dev Utilization = Total Receivables / Total Assets
-     * @return The utilization rate in RAY (1e27) precision
+     * @return The utilization rate in WAD (1e18) precision
      */
     function utilizationRate() public view returns (uint) {
         uint totalReceivables_ = totalReceivables();
         uint totalAssets_ = totalReceivables_ + IERC20(asset()).balanceOf(address(this));
-        return totalReceivables_.mulDiv(RAY, totalAssets_);
+        return totalReceivables_.mulDiv(WAD, totalAssets_);
     }
 
     /**
@@ -219,19 +219,19 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
     /**
      * @notice Returns the accumulated interest factor for the pool
      * @dev Used to calculate the base debt for borrowers
-     * @return The accumulated interest factor in RAY (1e27) precision
+     * @return The accumulated interest factor in WAD (1e18) precision
      */
     function accumulatedInterestFactor() public view returns (uint) {
         if (storedAccInterestFactor == 0) {
-            return RAY;
+            return WAD;
         } else {
             // newFactor = oldFactor * (1 + ratePerSecond)^secondsSinceLastUpdate
             return storedAccInterestFactor.mulDiv(
-                RayMath.rayPow(
-                    RAY + interestRate(),
+                WadMath.wadPow(
+                    WAD + interestRate(),
                     block.timestamp - lastAccumulatedInterestUpdate
                 ),
-                RAY,
+                WAD,
                 Math.Rounding.Ceil
             );
         }
@@ -239,8 +239,8 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
 
     /**
      * @notice Returns the current interest rate for the pool
-     * @dev The maximum interest rate is 1000% annual, represented as a per-second rate in RAY (1e27) precision
-     * @return The interest rate per-second in RAY (1e27) precision
+     * @dev The maximum interest rate is 1000% annual, represented as a per-second rate in WAD (1e18) precision
+     * @return The interest rate per-second in WAD (1e18) precision
      */
     function interestRate() public view returns (uint) {
         uint rate = params.interestRate(_utilizationRate(storedAccInterestFactor));
@@ -310,7 +310,7 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
                 newPenaltyCounterStart_ += (block.timestamp - newPenaltyCounterStart_).mulDiv(baseDebtPayment_, baseDebt_);
             }
 
-            uint scaledDebt_ = baseDebtPayment_.mulDiv(RAY, storedAccInterestFactor, Math.Rounding.Ceil);
+            uint scaledDebt_ = baseDebtPayment_.mulDiv(WAD, storedAccInterestFactor, Math.Rounding.Ceil);
             borrowers[borrower].scaledDebt -= scaledDebt_;
             scaledReceivables -= scaledDebt_;
 
@@ -385,12 +385,12 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
      * @notice Internal function to calculate the utilization rate
      * @dev Utilization rate = Total Receivables / Total Assets
      * @param accInterestFactor The accumulated interest factor
-     * @return The utilization rate in RAY (1e27) precision
+     * @return The utilization rate in WAD (1e18) precision
      */
     function _utilizationRate(uint accInterestFactor) internal view returns (uint) {
         uint totalReceivables_ = _totalReceivables(accInterestFactor);
         uint totalAssets_ = totalReceivables_ + IERC20(asset()).balanceOf(address(this));
-        return totalReceivables_.mulDiv(RAY, totalAssets_);
+        return totalReceivables_.mulDiv(WAD, totalAssets_);
     }
 
     /**
@@ -400,7 +400,7 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
      * @return The total receivables amount
      */
     function _totalReceivables(uint accInterestFactor) internal view returns (uint) {
-        return scaledReceivables.mulDiv(accInterestFactor, RAY);
+        return scaledReceivables.mulDiv(accInterestFactor, WAD);
     }
 
     /**
@@ -411,7 +411,7 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
      * @return The base debt amount for the borrower
      */
     function _baseDebt(address borrower, uint accInterestFactor) internal view returns (uint) {
-        return borrowers[borrower].scaledDebt.mulDiv(accInterestFactor, RAY);
+        return borrowers[borrower].scaledDebt.mulDiv(accInterestFactor, WAD);
     }
 
     /**
@@ -425,6 +425,6 @@ contract InventoryPool01 is ERC4626, Ownable, IInventoryPool01, ReentrancyGuardT
         uint penaltyTime_ = penaltyTime(borrower);
         if (penaltyTime_ == 0) return 0;
 
-        return (_baseDebt(borrower, accInterestFactor) * penaltyTime_).mulDiv(params.penaltyRate(), RAY);
+        return (_baseDebt(borrower, accInterestFactor) * penaltyTime_).mulDiv(params.penaltyRate(), WAD);
     }
 }
