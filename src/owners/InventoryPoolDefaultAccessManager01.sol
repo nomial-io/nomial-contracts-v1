@@ -34,6 +34,11 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, EIP712 
     // Track used signatures to prevent replay
     mapping(bytes32 => bool) public usedSigHashes;
 
+    /**
+     * @notice Initializes the contract with an admin and sets up role hierarchy
+     * @param admin Address to be granted the DEFAULT_ADMIN_ROLE
+     * @dev Sets VALIDATOR_ROLE as the admin of BORROWER_ROLE
+     */
     constructor(address admin) EIP712("InventoryPoolDefaultAccessManager01", "1") {
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _setRoleAdmin(BORROWER_ROLE, VALIDATOR_ROLE);
@@ -41,13 +46,16 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, EIP712 
 
     /**
      * @notice Execute borrow on an inventory pool
-     * @dev Can only be called by a borrower with a signature from a validator
+     * @dev Borrows are allowed within debt and penalty constraints, and with a signature from a validator
      * @param pool Address of the inventory pool contract, which should have this contract set as owner
      * @param amount Amount to borrow from pool
      * @param recipient Address to receive the borrowed assets
      * @param expiry Timestamp after which the borrow is no longer valid
-     * @param salt Value for uniqueness of signature hash
+     * @param salt Unique value to prevent replay
      * @param signature EIP-712 signature from a validator
+     * @custom:throws SignatureUsed if the signature has been used before
+     * @custom:throws BorrowerLoanDefault if the borrower has outstanding penalty debt
+     * @custom:throws BorrowerDebtLimitExceeded if the borrow would exceed the borrower's debt limit
      */
     function borrow(
         InventoryPool01 pool,
@@ -89,6 +97,13 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, EIP712 
         pool.borrow(amount, borrower, recipient, expiry, block.chainid);
     }
 
+    /**
+     * @notice Sets the maximum debt limit for a borrower in a specific pool
+     * @dev Can only be called by accounts with VALIDATOR_ROLE
+     * @param pool The inventory pool to set the limit for
+     * @param borrower The borrower address to set the limit for
+     * @param debtLimit The maximum amount of debt allowed (0 means no limit)
+     */
     function setBorrowerDebtLimit(
         InventoryPool01 pool,
         address borrower,
@@ -97,6 +112,13 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, EIP712 
         borrowerDebtLimit[pool][borrower] = debtLimit;
     }
 
+    /**
+     * @notice Forgives a specified amount of debt for a borrower
+     * @dev Can only be called by accounts with VALIDATOR_ROLE
+     * @param pool The inventory pool where the debt exists
+     * @param amount The amount of debt to forgive
+     * @param borrower The borrower whose debt should be forgiven
+     */
     function forgiveDebt(
         InventoryPool01 pool,
         uint amount,
@@ -105,26 +127,64 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, EIP712 
         pool.forgiveDebt(amount, borrower);
     }
 
+    /**
+     * @notice Updates the base fee in the params contract
+     * @dev Can only be called by accounts with VALIDATOR_ROLE
+     * @param paramsContract The params contract to update
+     * @param newBaseFee The new base fee value to set
+     */
     function updateBaseFee(OwnableParams01 paramsContract, uint newBaseFee) external onlyRole(VALIDATOR_ROLE) {
         paramsContract.updateBaseFee(newBaseFee);
     }
 
+    /**
+     * @notice Updates the interest rate in the params contract
+     * @dev Can only be called by accounts with VALIDATOR_ROLE
+     * @param paramsContract The params contract to update
+     * @param newInterestRate The new interest rate value to set
+     */
     function updateInterestRate(OwnableParams01 paramsContract, uint newInterestRate) external onlyRole(VALIDATOR_ROLE) {
         paramsContract.updateInterestRate(newInterestRate);
     }
 
+    /**
+     * @notice Updates the penalty rate in the params contract
+     * @dev Can only be called by accounts with VALIDATOR_ROLE
+     * @param paramsContract The params contract to update
+     * @param newPenaltyRate The new penalty rate value to set
+     */
     function updatePenaltyRate(OwnableParams01 paramsContract, uint newPenaltyRate) external onlyRole(VALIDATOR_ROLE) {
         paramsContract.updatePenaltyRate(newPenaltyRate);
     }
 
+    /**
+     * @notice Updates the penalty period in the params contract
+     * @dev Can only be called by accounts with VALIDATOR_ROLE
+     * @param paramsContract The params contract to update
+     * @param newPenaltyPeriod The new penalty period value to set
+     */
     function updatePenaltyPeriod(OwnableParams01 paramsContract, uint newPenaltyPeriod) external onlyRole(VALIDATOR_ROLE) {
         paramsContract.updatePenaltyPeriod(newPenaltyPeriod);
     }
 
+    /**
+     * @notice Upgrades the params contract for an inventory pool
+     * @dev Can only be called by accounts with DEFAULT_ADMIN_ROLE
+     * @param pool The inventory pool to upgrade
+     * @param paramsContract The new params contract to use
+     */
     function upgradeParamsContract(InventoryPool01 pool, IInventoryPoolParams01 paramsContract) external onlyRole(DEFAULT_ADMIN_ROLE) {
         pool.upgradeParamsContract(paramsContract);
     }
 
+    /**
+     * @notice Overwrites core state variables in an inventory pool
+     * @dev Can only be called by accounts with DEFAULT_ADMIN_ROLE
+     * @param pool The inventory pool to overwrite core state
+     * @param newStoredAccInterestFactor New value for stored accumulated interest factor
+     * @param newLastAccumulatedInterestUpdate New value for last accumulated interest update timestamp
+     * @param newScaledReceivables New value for scaled receivables
+     */
     function overwriteCoreState(
         InventoryPool01 pool,
         uint newStoredAccInterestFactor,
@@ -134,6 +194,12 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, EIP712 
         pool.overwriteCoreState(newStoredAccInterestFactor, newLastAccumulatedInterestUpdate, newScaledReceivables);
     }
 
+    /**
+     * @notice Transfers ownership of a contract owned by this contract
+     * @dev Can only be called by accounts with DEFAULT_ADMIN_ROLE
+     * @param ownedContract The contract to transfer ownership of
+     * @param newOwner The address to transfer ownership to
+     */
     function transferOwnership(Ownable ownedContract, address newOwner) external onlyRole(DEFAULT_ADMIN_ROLE) {
         ownedContract.transferOwnership(newOwner);
     }
