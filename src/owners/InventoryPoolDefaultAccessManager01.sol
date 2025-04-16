@@ -18,7 +18,7 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, EIP712 
     bytes32 public constant VALIDATOR_ROLE = keccak256("VALIDATOR_ROLE");
     bytes32 public constant BORROWER_ROLE = keccak256("BORROWER_ROLE");
 
-    bytes32 private constant BORROW_TYPEHASH = keccak256(
+    bytes32 public constant BORROW_TYPEHASH = keccak256(
         "Borrow(address pool,address borrower,uint256 amount,address recipient,uint256 expiry,uint256 chainId,bytes32 salt)"
     );
 
@@ -202,5 +202,13 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, EIP712 
      */
     function transferOwnership(Ownable ownedContract, address newOwner) external onlyRole(DEFAULT_ADMIN_ROLE) {
         ownedContract.transferOwnership(newOwner);
+    }
+
+    function domainSeparator() public view returns (bytes32) {
+        return _domainSeparatorV4();
+    }
+
+    function hashTypedData(bytes32 structHash) public view returns (bytes32) {
+        return _hashTypedDataV4(structHash);
     }
 }
