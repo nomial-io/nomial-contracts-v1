@@ -292,6 +292,63 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
         vm.stopPrank();
     }
 
+    function testInventoryPoolDefaultAccessManager01_addValidator_success() public {
+        address newValidator = address(0x456);
+        uint16 newSignatureThreshold = 3;
+
+        bytes32 digest = accessManager.hashTypedData(keccak256(abi.encode(
+            accessManager.ADD_VALIDATOR_TYPEHASH(),
+            newValidator,
+            newSignatureThreshold
+        )));
+        bytes[] memory signatures = getValidatorSignatures(digest);
+
+        vm.startPrank(admin);
+        accessManager.addValidator(newValidator, newSignatureThreshold, signatures);
+        vm.stopPrank();
+
+        assertTrue(accessManager.hasRole(VALIDATOR_ROLE, newValidator), "New validator should have validator role");
+        assertEq(accessManager.validatorCount(), 4, "Validator count should be incremented");
+        assertEq(accessManager.signatureThreshold(), newSignatureThreshold, "Signature threshold should be updated");
+    }
+
+    function testInventoryPoolDefaultAccessManager01_removeValidator_success() public {
+        uint16 newSignatureThreshold = 2;
+
+        bytes32 digest = accessManager.hashTypedData(keccak256(abi.encode(
+            accessManager.REMOVE_VALIDATOR_TYPEHASH(),
+            validator3,
+            newSignatureThreshold
+        )));
+        bytes[] memory signatures = getValidatorSignatures(digest);
+
+        vm.startPrank(admin);
+        accessManager.removeValidator(validator3, newSignatureThreshold, signatures);
+        vm.stopPrank();
+
+        assertFalse(accessManager.hasRole(VALIDATOR_ROLE, validator3), "Removed validator should not have validator role");
+        assertEq(accessManager.validatorCount(), 2, "Validator count should be decremented");
+        assertEq(accessManager.signatureThreshold(), newSignatureThreshold, "Signature threshold should be updated");
+    }
+
+    function testInventoryPoolDefaultAccessManager01_setSignatureThreshold_success() public {
+        uint16 newSignatureThreshold = 3;
+
+        bytes32 digest = accessManager.hashTypedData(keccak256(abi.encode(
+            accessManager.SET_SIGNATURE_THRESHOLD_TYPEHASH(),
+            newSignatureThreshold
+        )));
+        bytes[] memory signatures = getValidatorSignatures(digest);
+
+        vm.startPrank(admin);
+        vm.expectEmit(true, true, true, true);
+        emit InventoryPoolDefaultAccessManager01.SignatureThresholdUpdated(newSignatureThreshold);
+        accessManager.setSignatureThreshold(newSignatureThreshold, signatures);
+        vm.stopPrank();
+
+        assertEq(accessManager.signatureThreshold(), newSignatureThreshold, "Signature threshold should be updated");
+    }
+
     function testInventoryPoolDefaultAccessManager01_updateInterestRate_onlyCallableByAdmin() public {
         vm.startPrank(validator1);
         vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, validator1, accessManager.DEFAULT_ADMIN_ROLE()));
