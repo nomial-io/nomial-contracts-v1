@@ -128,6 +128,34 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
         accessManager.borrow(pool, amount, recipient, expiry, salt, signatures);
     }
 
+    function testInventoryPoolDefaultAccessManager01_borrow_nonValidatorSignatureReverts() public {
+        InventoryPool01 pool = wethInventoryPool;
+        uint amount = 1 * 10**18;
+        uint expiry = block.timestamp + 100;
+        bytes32 salt = bytes32(block.timestamp);
+        bytes32 digest = accessManager.hashTypedData(keccak256(abi.encode(
+            accessManager.BORROW_TYPEHASH(),
+            pool,
+            borrower,
+            amount,
+            recipient,
+            expiry,
+            block.chainid,
+            salt
+        )));
+
+        uint256[] memory privKeys = new uint256[](2);
+        privKeys[0] = validator1_pk;
+        privKeys[1] = 0x999; // private key for non-validator
+        address nonValidator = vm.addr(privKeys[1]);
+
+        bytes[] memory signatures = getSignaturesFromKeys(digest, privKeys);
+
+        vm.prank(borrower);
+        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, nonValidator, VALIDATOR_ROLE));
+        accessManager.borrow(pool, amount, recipient, expiry, salt, signatures);
+    }
+
     function testInventoryPoolDefaultAccessManager01_forgiveDebt_success() public {
         // First create a borrow position
         InventoryPool01 pool = wethInventoryPool;
@@ -504,11 +532,19 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
 
     // Helper function to get 2 validator signatures
     function getValidatorSignatures(bytes32 digest) internal pure returns (bytes[] memory) {
-        bytes[] memory signatures = new bytes[](2);
-        (uint8 v1, bytes32 r1, bytes32 s1) = vm.sign(validator1_pk, digest);
-        (uint8 v2, bytes32 r2, bytes32 s2) = vm.sign(validator2_pk, digest);
-        signatures[0] = abi.encodePacked(r1, s1, v1);
-        signatures[1] = abi.encodePacked(r2, s2, v2);
+        uint256[] memory privKeys = new uint256[](2);
+        privKeys[0] = validator1_pk;
+        privKeys[1] = validator2_pk;
+        return getSignaturesFromKeys(digest, privKeys);
+    }
+
+    // Helper function to get signatures from specific private keys
+    function getSignaturesFromKeys(bytes32 digest, uint256[] memory privKeys) internal pure returns (bytes[] memory) {
+        bytes[] memory signatures = new bytes[](privKeys.length);
+        for (uint i = 0; i < privKeys.length; i++) {
+            (uint8 v, bytes32 r, bytes32 s) = vm.sign(privKeys[i], digest);
+            signatures[i] = abi.encodePacked(r, s, v);
+        }
         return signatures;
     }
 }
