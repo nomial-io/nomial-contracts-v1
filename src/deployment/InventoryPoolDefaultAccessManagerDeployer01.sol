@@ -11,11 +11,11 @@ contract InventoryPoolDefaultAccessManagerDeployer01 {
 
     function deployAccessManagerAddress(
         bytes32 salt,
-        address admin
+        bytes memory deployAccessManagerArgs
     ) public view returns (address payable addr, bytes memory bytecode) {
         bytecode = abi.encodePacked(
             type(InventoryPoolDefaultAccessManager01).creationCode,
-            abi.encode(admin)
+            deployAccessManagerArgs
         );
 
         addr = payable(DeployerLib.addressFromBytecode(address(this), salt, bytecode));
@@ -23,9 +23,9 @@ contract InventoryPoolDefaultAccessManagerDeployer01 {
 
     function deployAccessManager(
         bytes32 salt,
-        address admin
+        bytes memory deployAccessManagerArgs
     ) public returns (address payable accessManagerAddress_) {
-        (address payable expectedAddr, bytes memory bytecode) = deployAccessManagerAddress(salt, admin);
+        (address payable expectedAddr, bytes memory bytecode) = deployAccessManagerAddress(salt, deployAccessManagerArgs);
 
         assembly {
             accessManagerAddress_ := create2(0, add(bytecode, 0x20), mload(bytecode), salt)

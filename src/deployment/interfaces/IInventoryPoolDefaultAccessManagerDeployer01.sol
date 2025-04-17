@@ -7,11 +7,11 @@ interface IInventoryPoolDefaultAccessManagerDeployer01 {
 
     function deployAccessManagerAddress(
         bytes32 salt,
-        address admin
+        bytes calldata accessManagerArgs
     ) external view returns (address payable addr, bytes memory bytecode);
 
     function deployAccessManager(
         bytes32 salt,
-        address admin
+        bytes calldata accessManagerArgs
     ) external returns (address payable accessManagerAddress_);
 }

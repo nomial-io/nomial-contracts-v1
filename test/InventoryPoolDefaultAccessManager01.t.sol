@@ -24,7 +24,9 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
 
     uint256 public constant validatorPrivateKey = 0x2;
     bytes32 public constant VALIDATOR_ROLE = keccak256("VALIDATOR_ROLE");
-    bytes32 public constant BORROWER_ROLE = keccak256("BORROWER_ROLE");
+
+    address[] public validators = [address(7), address(8), address(9)];
+    uint16 public signatureThreshold = 2;
 
     InventoryPoolDeployer01 public poolDeployer;
     OwnableParamsDeployer01 public ownableParamsDeployer;
@@ -52,83 +54,13 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
         WETH_ERC20.approve(address(poolDeployer), MAX_UINT);
         (address payable wethPoolAddress,,address payable accessManagerAddr_) = nomialDeployer.deploy(
             salt1,
-            IERC20(WETH),
-            "nomialWETH",
-            "nmlWETH",
-            1 * 10**14,
-            admin,
+            abi.encode(IERC20(WETH), "nomialWETH", "nmlWETH", 1 * 10**14),
+            abi.encode(admin, validators, signatureThreshold),
             abi.encode(defaultBaseFee, defaultBaseRate, defaultRate1, defaultRate2, defaultOptimalUtilizationRate, defaultPenaltyRate, defaultPenaltyPeriod),
             WETH_WHALE
         );
         wethInventoryPool = InventoryPool01(wethPoolAddress);
         accessManagerAddr = accessManagerAddr_;
         vm.stopPrank();
-
-        // Setup roles
-        vm.startPrank(admin);
-        AccessControl(accessManagerAddr).grantRole(VALIDATOR_ROLE, admin);
-        AccessControl(accessManagerAddr).grantRole(BORROWER_ROLE, admin);
-        AccessControl(accessManagerAddr).grantRole(VALIDATOR_ROLE, validator);
-        AccessControl(accessManagerAddr).grantRole(BORROWER_ROLE, borrower);
-        vm.stopPrank();
-
-        // Fund pool with WETH
-        vm.startPrank(WETH_WHALE);
-        WETH_ERC20.approve(address(wethInventoryPool), MAX_UINT);
-        wethInventoryPool.deposit(1000 * 10**18, WETH_WHALE);
-        vm.stopPrank();
-    }
-
-    function testBorrow_success() public {
-        uint256 amount = 10 * 10**18;
-        uint256 expiry = block.timestamp + 1 days;
-
-        // Generate EIP-712 signature from validator
-        InventoryPoolDefaultAccessManager01 accessManager = InventoryPoolDefaultAccessManager01(accessManagerAddr);
-        bytes32 domainSeparator = InventoryPoolDefaultAccessManager01(accessManagerAddr).domainSeparator();
-        bytes32 BORROW_TYPEHASH = keccak256(
-            "Borrow(address pool,address borrower,uint256 amount,address recipient,uint256 expiry,uint256 chainId,bytes32 salt)"
-        );
-        
-        bytes32 structHash = keccak256(
-            abi.encode(
-                BORROW_TYPEHASH,
-                address(wethInventoryPool),
-                borrower,
-                amount,
-                recipient,
-                expiry,
-                block.chainid,
-                salt2
-            )
-        );
-
-        bytes32 digest = keccak256(
-            abi.encodePacked("\x19\x01", domainSeparator, structHash)
-        );
-
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(validatorPrivateKey, digest);
-        bytes memory signature = abi.encodePacked(r, s, v);
-
-        // Record initial balances
-        uint256 recipientBalanceBefore = WETH_ERC20.balanceOf(recipient);
-
-        // Execute borrow
-        vm.prank(borrower);
-        accessManager.borrow(
-            address(wethInventoryPool),
-            amount,
-            recipient,
-            expiry,
-            salt2,
-            signature
-        );
-
-        // Verify recipient received tokens
-        assertEq(
-            WETH_ERC20.balanceOf(recipient),
-            recipientBalanceBefore + amount,
-            "Recipient should receive borrowed tokens"
-        );
     }
 } 

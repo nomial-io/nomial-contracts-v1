@@ -8,12 +8,12 @@ interface IInventoryPoolParamsDeployer01 {
     function deployParams(
         bytes32 salt,
         address owner,
-        bytes calldata paramsInitData
+        bytes calldata paramsArgs
     ) external returns (address payable);
 
     function deployParamsAddress(
         bytes32 salt,
         address owner,
-        bytes calldata paramsInitData
+        bytes calldata paramsArgs
     ) external view returns (address payable addr, bytes memory bytecode);
 }

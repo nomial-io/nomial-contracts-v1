@@ -26,56 +26,49 @@ contract NomialDeployer01 is INomialDeployer01 {
 
     function deploy(
         bytes32 salt,
-        IERC20 asset,
-        string calldata name,
-        string calldata symbol,
-        uint initAmount,
-        address owner,
-        bytes calldata paramsInitData,
+        bytes memory accessManagerArgs,
+        bytes memory deployParamsArgs,
+        bytes memory deployPoolArgs,
         address poolFunder
     ) external returns (address payable pool, address payable params, address payable accessManager) {
-        accessManager = accessManagerDeployer.deployAccessManager(salt, owner);
-        params = paramsDeployer.deployParams(salt, accessManager, paramsInitData);
+        accessManager = accessManagerDeployer.deployAccessManager(salt, accessManagerArgs);
+        params = paramsDeployer.deployParams(
+            salt, 
+            accessManager, // owned by access manager
+            deployParamsArgs
+        );
         pool = poolDeployer.deployPool(
             salt, 
-            asset, 
-            name, 
-            symbol, 
-            initAmount, 
             accessManager, // owned by access manager
-            params,
-            poolFunder
+            params, // uses deployed params contract
+            poolFunder,
+            deployPoolArgs
         );
     }
 
     function deployAddresses(
         bytes32 salt,
-        IERC20 asset,
-        string calldata name,
-        string calldata symbol,
-        uint initAmount,
-        address admin,
-        bytes calldata paramsInitData
+        bytes memory accessManagerArgs,
+        bytes memory paramsArgs,
+        bytes memory poolArgs
     ) public view returns (address payable pool, address payable params, address payable accessManager) {
         // Get access manager address first since it's needed for pool deployment
-        (accessManager,) = accessManagerDeployer.deployAccessManagerAddress(salt, admin);  
+        (accessManager,) = accessManagerDeployer.deployAccessManagerAddress(salt, accessManagerArgs);  
 
         // Get params address first since it's needed for pool deployment
         (params,) = paramsDeployer.deployParamsAddress(
             salt,
             accessManager, // owned by access manager
-            paramsInitData
+            paramsArgs
         );
 
         // Get pool address using params address
         (pool,) = poolDeployer.deployPoolAddress(
             salt,
-            asset,
-            name,
-            symbol,
-            initAmount,
             accessManager, // owned by access manager
-            params
+            params, // uses deployed params contract
+            poolArgs
         );
     }
 }
+
