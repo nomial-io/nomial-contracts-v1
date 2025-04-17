@@ -35,6 +35,7 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
     InventoryPoolDefaultAccessManagerDeployer01 public accessManagerDeployer;
     InventoryPool01 public wethInventoryPool;
     address public accessManagerAddr;
+    InventoryPoolDefaultAccessManager01 public accessManager;
 
     function setUp() public {
         setupAll();
@@ -50,17 +51,31 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
         );
 
         // Deploy WETH pool
+        // Deploy WETH pool
         vm.startPrank(WETH_WHALE);
         WETH_ERC20.approve(address(poolDeployer), MAX_UINT);
-        (address payable wethPoolAddress,,address payable accessManagerAddr_) = nomialDeployer.deploy(
-            salt1,
-            abi.encode(IERC20(WETH), "nomialWETH", "nmlWETH", 1 * 10**14),
+        (address payable wethPoolAddress,,address payable wethPoolAccessManager_) = nomialDeployer.deploy(
+            salt2,
             abi.encode(admin, validators, signatureThreshold),
             abi.encode(defaultBaseFee, defaultBaseRate, defaultRate1, defaultRate2, defaultOptimalUtilizationRate, defaultPenaltyRate, defaultPenaltyPeriod),
+            abi.encode(IERC20(WETH), "nomialWETH", "nmlWETH", 1 * 10**14),
             WETH_WHALE
         );
         wethInventoryPool = InventoryPool01(wethPoolAddress);
-        accessManagerAddr = accessManagerAddr_;
+        accessManagerAddr = wethPoolAccessManager_;
+        accessManager = InventoryPoolDefaultAccessManager01(accessManagerAddr);
         vm.stopPrank();
+    }
+
+    function testInventoryPoolDefaultAccessManager01_constructor() public {
+        assertTrue(accessManagerAddr.code.length > 0, "Access manager should be deployed");
+
+        assertTrue(accessManager.hasRole(accessManager.DEFAULT_ADMIN_ROLE(), admin), "Admin should have default role");
+
+        for (uint i = 0; i < validators.length; i++) {
+            assertTrue(accessManager.hasRole(accessManager.VALIDATOR_ROLE(), validators[i]), "Validator should have validator role");
+        }
+
+        assertTrue(accessManager.signatureThreshold() == signatureThreshold, "Signature threshold should be set");
     }
 } 
