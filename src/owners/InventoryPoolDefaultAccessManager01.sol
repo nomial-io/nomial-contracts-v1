@@ -352,12 +352,24 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, EIP712 
         emit SignatureThresholdUpdated(newSignatureThreshold);
     }
 
+    /**
+     * @notice Internal function to grant the validator role to an address
+     * @dev Wraps AccessControl._grantRole
+     * @param validator The address to be granted the validator role
+     * @custom:revert ValidatorExists If the address already has the validator role
+     */
     function _grantValidatorRole(address validator) internal {
         if(!_grantRole(VALIDATOR_ROLE, validator)) {
             revert ValidatorExists(validator);
         }
     }
 
+    /**
+     * @notice Internal function to revoke the validator role from an address
+     * @dev Wraps AccessControl._revokeRole
+     * @param validator The address to have the validator role revoked
+     * @custom:revert ValidatorDoesNotExist If the address does not have the validator role
+     */
     function _revokeValidatorRole(address validator) internal {
         if(!_revokeRole(VALIDATOR_ROLE, validator)) {
             revert ValidatorDoesNotExist(validator);
