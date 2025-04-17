@@ -90,6 +90,20 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
         assertTrue(accessManager.signatureThreshold() == signatureThreshold, "Signature threshold should be set");
     }
 
+    function testInventoryPoolDefaultAccessManager01_constructor_duplicateValidatorReverts() public {
+        address[] memory duplicateValidators = new address[](3);
+        duplicateValidators[0] = validator1;
+        duplicateValidators[1] = validator2;
+        duplicateValidators[2] = validator1; // Duplicate validator1
+
+        vm.expectRevert(abi.encodeWithSelector(InventoryPoolDefaultAccessManager01.ValidatorExists.selector, validator1));
+        new InventoryPoolDefaultAccessManager01(
+            admin,
+            duplicateValidators,
+            signatureThreshold
+        );
+    }
+
     // Helper function to get 2 validator signatures
     function getValidatorSignatures(bytes32 digest) internal pure returns (bytes[] memory) {
         bytes[] memory signatures = new bytes[](2);
@@ -345,6 +359,23 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
         assertFalse(accessManager.hasRole(VALIDATOR_ROLE, validator3), "Removed validator should not have validator role");
         assertEq(accessManager.validatorCount(), 2, "Validator count should be decremented");
         assertEq(accessManager.signatureThreshold(), newSignatureThreshold, "Signature threshold should be updated");
+    }
+
+    function testInventoryPoolDefaultAccessManager01_removeValidator_nonValidatorReverts() public {
+        address nonValidator = address(0x789);
+        uint16 newSignatureThreshold = 2;
+
+        bytes32 digest = accessManager.hashTypedData(keccak256(abi.encode(
+            accessManager.REMOVE_VALIDATOR_TYPEHASH(),
+            nonValidator,
+            newSignatureThreshold
+        )));
+        bytes[] memory signatures = getValidatorSignatures(digest);
+
+        vm.startPrank(admin);
+        vm.expectRevert(abi.encodeWithSelector(InventoryPoolDefaultAccessManager01.ValidatorDoesNotExist.selector, nonValidator));
+        accessManager.removeValidator(nonValidator, newSignatureThreshold, signatures);
+        vm.stopPrank();
     }
 
     function testInventoryPoolDefaultAccessManager01_setSignatureThreshold_success() public {
