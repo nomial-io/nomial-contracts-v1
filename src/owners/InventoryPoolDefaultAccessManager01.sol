@@ -36,6 +36,7 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, EIP712 
     bytes32 public constant OVERWRITE_CORE_STATE_TYPEHASH = keccak256("OverwriteCoreState(address pool,uint256 newStoredAccInterestFactor,uint256 newLastAccumulatedInterestUpdate,uint256 newScaledReceivables)");
     bytes32 public constant TRANSFER_OWNERSHIP_TYPEHASH = keccak256("TransferOwnership(address ownedContract,address newOwner)");
     bytes32 public constant SET_SIGNATURE_THRESHOLD_TYPEHASH = keccak256("SetSignatureThreshold(uint16 newSignatureThreshold)");
+
     event SignatureThresholdUpdated(uint16 newSignatureThreshold);
 
     error SignatureUsed(bytes32 sigHash);
@@ -101,7 +102,7 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, EIP712 
         uint expiry,
         bytes32 salt,
         bytes[] calldata signatures
-    ) external {
+    ) external onlyRole(BORROWER_ROLE) {
         address borrower = _msgSender();
 
         bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(BORROW_TYPEHASH, pool, borrower, amount, recipient, expiry, block.chainid, salt)));

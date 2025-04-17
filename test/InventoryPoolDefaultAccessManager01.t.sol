@@ -174,6 +174,31 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
         accessManager.borrow(pool, amount, recipient, expiry, salt, signatures);
     }
 
+    function testInventoryPoolDefaultAccessManager01_borrow_nonBorrowerReverts() public {
+        InventoryPool01 pool = wethInventoryPool;
+        address nonBorrower = address(123);
+        uint amount = 1 * 10**18;
+        uint expiry = block.timestamp + 100;
+        bytes32 salt = bytes32(block.timestamp);
+        bytes32 digest = accessManager.hashTypedData(keccak256(abi.encode(
+            accessManager.BORROW_TYPEHASH(),
+            pool,
+            nonBorrower,
+            amount,
+            recipient,
+            expiry,
+            block.chainid,
+            salt
+        )));
+
+        bytes[] memory signatures = getValidatorSignatures(digest);
+
+        vm.startPrank(nonBorrower);
+        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, nonBorrower, accessManager.BORROWER_ROLE()));
+        accessManager.borrow(pool, amount, recipient, expiry, salt, signatures);
+        vm.stopPrank();
+    }
+
     function testInventoryPoolDefaultAccessManager01_forgiveDebt_success() public {
         // First create a borrow position
         InventoryPool01 pool = wethInventoryPool;
