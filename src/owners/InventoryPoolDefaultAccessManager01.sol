@@ -32,7 +32,7 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, EIP712 
     bytes32 public constant UPGRADE_PARAMS_CONTRACT_TYPEHASH = keccak256("UpgradeParamsContract(address pool,address paramsContract)");
     bytes32 public constant OVERWRITE_CORE_STATE_TYPEHASH = keccak256("OverwriteCoreState(address pool,uint256 newStoredAccInterestFactor,uint256 newLastAccumulatedInterestUpdate,uint256 newScaledReceivables)");
     bytes32 public constant TRANSFER_OWNERSHIP_TYPEHASH = keccak256("TransferOwnership(address ownedContract,address newOwner)");
-
+    bytes32 public constant SET_SIGNATURE_THRESHOLD_TYPEHASH = keccak256("SetSignatureThreshold(uint16 newSignatureThreshold)");
     event SignatureThresholdUpdated(uint16 newSignatureThreshold);
 
     error SignatureUsed(bytes32 sigHash);
@@ -255,6 +255,19 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, EIP712 
 
         _revokeRole(VALIDATOR_ROLE, validator);
         validatorCount--;
+        _setSignatureThreshold(newSignatureThreshold);
+    }
+
+    /**
+     * @notice Sets the signature threshold
+     * @dev Requires signatures from the threshold number of validators. Can only be called by DEFAULT_ADMIN_ROLE
+     * @param newSignatureThreshold The new signature threshold to set
+     * @param signatures Array of validator signatures
+     */
+    function setSignatureThreshold(uint16 newSignatureThreshold, bytes[] calldata signatures) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(SET_SIGNATURE_THRESHOLD_TYPEHASH, newSignatureThreshold)));
+        _validateSignatures(digest, signatures);
+
         _setSignatureThreshold(newSignatureThreshold);
     }
 

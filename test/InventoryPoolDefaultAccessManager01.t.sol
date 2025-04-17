@@ -355,4 +355,32 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
         accessManager.transferOwnership(wethInventoryPool, address(0x123), new bytes[](0));
         vm.stopPrank();
     }
+
+    function testInventoryPoolDefaultAccessManager01_addValidator_onlyCallableByAdmin() public {
+        address newValidator = address(0x456);
+        uint16 newSignatureThreshold = 3;
+
+        vm.startPrank(validator1);
+        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, validator1, accessManager.DEFAULT_ADMIN_ROLE()));
+        accessManager.addValidator(newValidator, newSignatureThreshold, new bytes[](0));
+        vm.stopPrank();
+    }
+
+    function testInventoryPoolDefaultAccessManager01_removeValidator_onlyCallableByAdmin() public {
+        uint16 newSignatureThreshold = 2;
+
+        vm.startPrank(validator1);
+        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, validator1, accessManager.DEFAULT_ADMIN_ROLE()));
+        accessManager.removeValidator(validator2, newSignatureThreshold, new bytes[](0));
+        vm.stopPrank();
+    }
+
+    function testInventoryPoolDefaultAccessManager01_setSignatureThreshold_onlyCallableByAdmin() public {
+        uint16 newSignatureThreshold = 3;
+
+        vm.startPrank(validator1);
+        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, validator1, accessManager.DEFAULT_ADMIN_ROLE()));
+        accessManager.setSignatureThreshold(newSignatureThreshold, new bytes[](0));
+        vm.stopPrank();
+    }
 }
