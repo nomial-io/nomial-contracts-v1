@@ -746,6 +746,42 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
         accessManager.setSignatureThreshold(newSignatureThreshold, signatures);
     }
 
+    function testInventoryPoolDefaultAccessManager01_setSignatureThreshold_tooHighReverts() public {
+        uint16 tooHighThreshold = uint16(validators.length + 1); // 4, which is greater than validator count of 3
+
+        bytes32 digest = accessManager.hashTypedData(keccak256(abi.encode(
+            accessManager.SET_SIGNATURE_THRESHOLD_TYPEHASH(),
+            tooHighThreshold
+        )));
+        bytes[] memory signatures = getValidatorSignatures(digest);
+
+        vm.prank(admin);
+        vm.expectRevert(abi.encodeWithSelector(
+            InventoryPoolDefaultAccessManager01.SignatureThresholdTooHigh.selector,
+            tooHighThreshold,
+            validators.length
+        ));
+        accessManager.setSignatureThreshold(tooHighThreshold, signatures);
+    }
+
+    function testInventoryPoolDefaultAccessManager01_setSignatureThreshold_tooLowReverts() public {
+        uint16 tooLowThreshold = uint16(validators.length / 2); // 1, which is <= half of validator count
+
+        bytes32 digest = accessManager.hashTypedData(keccak256(abi.encode(
+            accessManager.SET_SIGNATURE_THRESHOLD_TYPEHASH(),
+            tooLowThreshold
+        )));
+        bytes[] memory signatures = getValidatorSignatures(digest);
+
+        vm.prank(admin);
+        vm.expectRevert(abi.encodeWithSelector(
+            InventoryPoolDefaultAccessManager01.SignatureThresholdTooLow.selector,
+            tooLowThreshold,
+            validators.length
+        ));
+        accessManager.setSignatureThreshold(tooLowThreshold, signatures);
+    }
+
     // Role management tests
     function testInventoryPoolDefaultAccessManager01_grantRole_reverts() public {
         vm.startPrank(admin);

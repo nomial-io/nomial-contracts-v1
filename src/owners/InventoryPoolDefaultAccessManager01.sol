@@ -283,7 +283,7 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, EIP712 
      * @notice Returns the EIP-712 domain separator
      * @return The domain separator used in EIP-712 signatures
      */
-    function domainSeparator() public view returns (bytes32) {
+    function domainSeparator() external view returns (bytes32) {
         return _domainSeparatorV4();
     }
 
@@ -292,7 +292,7 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, EIP712 
      * @param structHash The hash of the struct data to be signed
      * @return The EIP-712 typed data hash
      */
-    function hashTypedData(bytes32 structHash) public view returns (bytes32) {
+    function hashTypedData(bytes32 structHash) external view returns (bytes32) {
         return _hashTypedDataV4(structHash);
     }
 
@@ -334,7 +334,6 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, EIP712 
             delete _seenSigners[digest][signers[i]];
         }
     }
-
 
     /**
      * @notice Internal function to update the signature threshold
