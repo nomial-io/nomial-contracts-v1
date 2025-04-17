@@ -312,6 +312,22 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
         assertEq(accessManager.signatureThreshold(), newSignatureThreshold, "Signature threshold should be updated");
     }
 
+    function testInventoryPoolDefaultAccessManager01_addValidator_existingValidatorReverts() public {
+        uint16 newSignatureThreshold = 3;
+
+        bytes32 digest = accessManager.hashTypedData(keccak256(abi.encode(
+            accessManager.ADD_VALIDATOR_TYPEHASH(),
+            validator1,
+            newSignatureThreshold
+        )));
+        bytes[] memory signatures = getValidatorSignatures(digest);
+
+        vm.startPrank(admin);
+        vm.expectRevert(abi.encodeWithSelector(InventoryPoolDefaultAccessManager01.ValidatorExists.selector, validator1));
+        accessManager.addValidator(validator1, newSignatureThreshold, signatures);
+        vm.stopPrank();
+    }
+
     function testInventoryPoolDefaultAccessManager01_removeValidator_success() public {
         uint16 newSignatureThreshold = 2;
 

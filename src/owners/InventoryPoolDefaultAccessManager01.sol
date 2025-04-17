@@ -43,6 +43,8 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, EIP712 
     error RenounceRoleNotAllowed();
     error InvalidSignatureCount(uint validSignatures, uint requiredSignatures);
     error ValidatorNotUnique(address validator);
+    error ValidatorExists(address validator);
+    error ValidatorDoesNotExist(address validator);
 
     // Track used signatures to prevent replay
     mapping(bytes32 => bool) public usedSigHashes;
@@ -64,7 +66,7 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, EIP712 
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         validatorCount = uint16(validators.length);
         for (uint i = 0; i < validators.length; i++) {
-            _grantRole(VALIDATOR_ROLE, validators[i]);
+            _grantValidatorRole(validators[i]);
         }
         _setSignatureThreshold(signatureThreshold_);
     }
@@ -243,7 +245,7 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, EIP712 
         bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(ADD_VALIDATOR_TYPEHASH, validator, newSignatureThreshold)));
         _validateSignatures(digest, signatures);
 
-        _grantRole(VALIDATOR_ROLE, validator);
+        _grantValidatorRole(validator);
         validatorCount++;
         _setSignatureThreshold(newSignatureThreshold);
     }
@@ -259,7 +261,7 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, EIP712 
         bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(REMOVE_VALIDATOR_TYPEHASH, validator, newSignatureThreshold)));
         _validateSignatures(digest, signatures);
 
-        _revokeRole(VALIDATOR_ROLE, validator);
+        _revokeValidatorRole(validator);
         validatorCount--;
         _setSignatureThreshold(newSignatureThreshold);
     }
@@ -348,5 +350,17 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, EIP712 
         signatureThreshold = newSignatureThreshold;
 
         emit SignatureThresholdUpdated(newSignatureThreshold);
+    }
+
+    function _grantValidatorRole(address validator) internal {
+        if(!_grantRole(VALIDATOR_ROLE, validator)) {
+            revert ValidatorExists(validator);
+        }
+    }
+
+    function _revokeValidatorRole(address validator) internal {
+        if(!_revokeRole(VALIDATOR_ROLE, validator)) {
+            revert ValidatorDoesNotExist(validator);
+        }
     }
 }
