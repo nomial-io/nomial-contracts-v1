@@ -207,6 +207,29 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
         vm.stopPrank();
     }
 
+    function testInventoryPoolDefaultAccessManager01_forgiveDebt_nonValidatorSignatureReverts() public {
+        InventoryPool01 pool = wethInventoryPool;
+        uint amount = 1 * 10**18;
+
+        bytes32 digest = accessManager.hashTypedData(keccak256(abi.encode(
+            accessManager.FORGIVE_DEBT_TYPEHASH(),
+            pool,
+            amount,
+            borrower
+        )));
+
+        uint256[] memory privKeys = new uint256[](2);
+        privKeys[0] = validator1_pk;
+        privKeys[1] = 0x999; // Random private key for non-validator
+        address nonValidator = vm.addr(privKeys[1]);
+
+        bytes[] memory signatures = getSignaturesFromKeys(digest, privKeys);
+
+        vm.prank(admin);
+        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, nonValidator, VALIDATOR_ROLE));
+        accessManager.forgiveDebt(pool, amount, borrower, signatures);
+    }
+
     function testInventoryPoolDefaultAccessManager01_updateBaseFee_success() public {
         uint newBaseFee = 100;
         bytes32 digest = accessManager.hashTypedData(keccak256(abi.encode(
@@ -226,6 +249,26 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
         vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, validator1, accessManager.DEFAULT_ADMIN_ROLE()));
         accessManager.updateBaseFee(ownableParams, 100, new bytes[](0));
         vm.stopPrank();
+    }
+
+    function testInventoryPoolDefaultAccessManager01_updateBaseFee_nonValidatorSignatureReverts() public {
+        uint newBaseFee = 100;
+        bytes32 digest = accessManager.hashTypedData(keccak256(abi.encode(
+            accessManager.UPDATE_BASE_FEE_TYPEHASH(),
+            ownableParams,
+            newBaseFee
+        )));
+
+        uint256[] memory privKeys = new uint256[](2);
+        privKeys[0] = validator1_pk;
+        privKeys[1] = 0x999; // Random private key for non-validator
+        address nonValidator = vm.addr(privKeys[1]);
+
+        bytes[] memory signatures = getSignaturesFromKeys(digest, privKeys);
+
+        vm.prank(admin);
+        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, nonValidator, VALIDATOR_ROLE));
+        accessManager.updateBaseFee(ownableParams, newBaseFee, signatures);
     }
 
     // Update interest rate tests
@@ -250,6 +293,26 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
         vm.stopPrank();
     }
 
+    function testInventoryPoolDefaultAccessManager01_updateInterestRate_nonValidatorSignatureReverts() public {
+        uint newInterestRate = 100;
+        bytes32 digest = accessManager.hashTypedData(keccak256(abi.encode(
+            accessManager.UPDATE_INTEREST_RATE_TYPEHASH(),
+            ownableParams,
+            newInterestRate
+        )));
+
+        uint256[] memory privKeys = new uint256[](2);
+        privKeys[0] = validator1_pk;
+        privKeys[1] = 0x999; // Random private key for non-validator
+        address nonValidator = vm.addr(privKeys[1]);
+
+        bytes[] memory signatures = getSignaturesFromKeys(digest, privKeys);
+
+        vm.prank(admin);
+        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, nonValidator, VALIDATOR_ROLE));
+        accessManager.updateInterestRate(ownableParams, newInterestRate, signatures);
+    }
+
     function testInventoryPoolDefaultAccessManager01_updatePenaltyRate_success() public {
         uint newPenaltyRate = 100;
         bytes32 digest = accessManager.hashTypedData(keccak256(abi.encode(
@@ -269,6 +332,26 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
         vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, validator1, accessManager.DEFAULT_ADMIN_ROLE()));
         accessManager.updatePenaltyRate(ownableParams, 100, new bytes[](0));
         vm.stopPrank();
+    }
+
+    function testInventoryPoolDefaultAccessManager01_updatePenaltyRate_nonValidatorSignatureReverts() public {
+        uint newPenaltyRate = 100;
+        bytes32 digest = accessManager.hashTypedData(keccak256(abi.encode(
+            accessManager.UPDATE_PENALTY_RATE_TYPEHASH(),
+            ownableParams,
+            newPenaltyRate
+        )));
+
+        uint256[] memory privKeys = new uint256[](2);
+        privKeys[0] = validator1_pk;
+        privKeys[1] = 0x999; // Random private key for non-validator
+        address nonValidator = vm.addr(privKeys[1]);
+
+        bytes[] memory signatures = getSignaturesFromKeys(digest, privKeys);
+
+        vm.prank(admin);
+        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, nonValidator, VALIDATOR_ROLE));
+        accessManager.updatePenaltyRate(ownableParams, newPenaltyRate, signatures);
     }
 
     // Update penalty period tests
@@ -292,6 +375,26 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
         vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, validator1, accessManager.DEFAULT_ADMIN_ROLE()));
         accessManager.updatePenaltyPeriod(ownableParams, 100, new bytes[](0));
         vm.stopPrank();
+    }
+
+    function testInventoryPoolDefaultAccessManager01_updatePenaltyPeriod_nonValidatorSignatureReverts() public {
+        uint newPenaltyPeriod = 100;
+        bytes32 digest = accessManager.hashTypedData(keccak256(abi.encode(
+            accessManager.UPDATE_PENALTY_PERIOD_TYPEHASH(),
+            ownableParams,
+            newPenaltyPeriod
+        )));
+
+        uint256[] memory privKeys = new uint256[](2);
+        privKeys[0] = validator1_pk;
+        privKeys[1] = 0x999; // Random private key for non-validator
+        address nonValidator = vm.addr(privKeys[1]);
+
+        bytes[] memory signatures = getSignaturesFromKeys(digest, privKeys);
+
+        vm.prank(admin);
+        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, nonValidator, VALIDATOR_ROLE));
+        accessManager.updatePenaltyPeriod(ownableParams, newPenaltyPeriod, signatures);
     }
 
     function testInventoryPoolDefaultAccessManager01_upgradeParamsContract_success() public {
@@ -332,6 +435,33 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
         vm.stopPrank();
     }
 
+    function testInventoryPoolDefaultAccessManager01_upgradeParamsContract_nonValidatorSignatureReverts() public {
+        OwnableParams01 newParams = new OwnableParams01(
+            defaultBaseFee,
+            defaultRate1,
+            defaultPenaltyRate,
+            defaultPenaltyPeriod,
+            address(accessManager)
+        );
+
+        bytes32 digest = accessManager.hashTypedData(keccak256(abi.encode(
+            accessManager.UPGRADE_PARAMS_CONTRACT_TYPEHASH(),
+            wethInventoryPool,
+            newParams
+        )));
+
+        uint256[] memory privKeys = new uint256[](2);
+        privKeys[0] = validator1_pk;
+        privKeys[1] = 0x999; // Random private key for non-validator
+        address nonValidator = vm.addr(privKeys[1]);
+
+        bytes[] memory signatures = getSignaturesFromKeys(digest, privKeys);
+
+        vm.prank(admin);
+        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, nonValidator, VALIDATOR_ROLE));
+        accessManager.upgradeParamsContract(wethInventoryPool, newParams, signatures);
+    }
+
     function testInventoryPoolDefaultAccessManager01_overwriteCoreState_success() public {
         uint storedAccInterestFactor = 100;
         uint lastAccumulatedInterestUpdate = 200;
@@ -367,6 +497,31 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
         vm.stopPrank();
     }
 
+    function testInventoryPoolDefaultAccessManager01_overwriteCoreState_nonValidatorSignatureReverts() public {
+        uint storedAccInterestFactor = 100;
+        uint lastAccumulatedInterestUpdate = 200;
+        uint scaledReceivables = 300;
+
+        bytes32 digest = accessManager.hashTypedData(keccak256(abi.encode(
+            accessManager.OVERWRITE_CORE_STATE_TYPEHASH(),
+            wethInventoryPool,
+            storedAccInterestFactor,
+            lastAccumulatedInterestUpdate,
+            scaledReceivables
+        )));
+
+        uint256[] memory privKeys = new uint256[](2);
+        privKeys[0] = validator1_pk;
+        privKeys[1] = 0x999; // Random private key for non-validator
+        address nonValidator = vm.addr(privKeys[1]);
+
+        bytes[] memory signatures = getSignaturesFromKeys(digest, privKeys);
+
+        vm.prank(admin);
+        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, nonValidator, VALIDATOR_ROLE));
+        accessManager.overwriteCoreState(wethInventoryPool, storedAccInterestFactor, lastAccumulatedInterestUpdate, scaledReceivables, signatures);
+    }
+
     function testInventoryPoolDefaultAccessManager01_transferOwnership_success() public {
         address newOwner = address(0x123);
         bytes32 digest = accessManager.hashTypedData(keccak256(abi.encode(
@@ -388,6 +543,26 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
         vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, validator1, accessManager.DEFAULT_ADMIN_ROLE()));
         accessManager.transferOwnership(wethInventoryPool, address(0x123), new bytes[](0));
         vm.stopPrank();
+    }
+
+    function testInventoryPoolDefaultAccessManager01_transferOwnership_nonValidatorSignatureReverts() public {
+        address newOwner = address(0x123);
+        bytes32 digest = accessManager.hashTypedData(keccak256(abi.encode(
+            accessManager.TRANSFER_OWNERSHIP_TYPEHASH(),
+            wethInventoryPool,
+            newOwner
+        )));
+
+        uint256[] memory privKeys = new uint256[](2);
+        privKeys[0] = validator1_pk;
+        privKeys[1] = 0x999; // Random private key for non-validator
+        address nonValidator = vm.addr(privKeys[1]);
+
+        bytes[] memory signatures = getSignaturesFromKeys(digest, privKeys);
+
+        vm.prank(admin);
+        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, nonValidator, VALIDATOR_ROLE));
+        accessManager.transferOwnership(wethInventoryPool, newOwner, signatures);
     }
 
     function testInventoryPoolDefaultAccessManager01_addValidator_success() public {
@@ -436,6 +611,28 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
         vm.stopPrank();
     }
 
+    function testInventoryPoolDefaultAccessManager01_addValidator_nonValidatorSignatureReverts() public {
+        address newValidator = address(0x456);
+        uint16 newSignatureThreshold = 3;
+
+        bytes32 digest = accessManager.hashTypedData(keccak256(abi.encode(
+            accessManager.ADD_VALIDATOR_TYPEHASH(),
+            newValidator,
+            newSignatureThreshold
+        )));
+
+        uint256[] memory privKeys = new uint256[](2);
+        privKeys[0] = validator1_pk;
+        privKeys[1] = 0x999; // Random private key for non-validator
+        address nonValidator = vm.addr(privKeys[1]);
+
+        bytes[] memory signatures = getSignaturesFromKeys(digest, privKeys);
+
+        vm.prank(admin);
+        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, nonValidator, VALIDATOR_ROLE));
+        accessManager.addValidator(newValidator, newSignatureThreshold, signatures);
+    }
+
     function testInventoryPoolDefaultAccessManager01_removeValidator_success() public {
         uint16 newSignatureThreshold = 2;
 
@@ -481,6 +678,27 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
         vm.stopPrank();
     }
 
+    function testInventoryPoolDefaultAccessManager01_removeValidator_nonValidatorSignatureReverts() public {
+        uint16 newSignatureThreshold = 2;
+
+        bytes32 digest = accessManager.hashTypedData(keccak256(abi.encode(
+            accessManager.REMOVE_VALIDATOR_TYPEHASH(),
+            validator3,
+            newSignatureThreshold
+        )));
+
+        uint256[] memory privKeys = new uint256[](2);
+        privKeys[0] = validator1_pk;
+        privKeys[1] = 0x999; // Random private key for non-validator
+        address nonValidator = vm.addr(privKeys[1]);
+
+        bytes[] memory signatures = getSignaturesFromKeys(digest, privKeys);
+
+        vm.prank(admin);
+        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, nonValidator, VALIDATOR_ROLE));
+        accessManager.removeValidator(validator3, newSignatureThreshold, signatures);
+    }
+
     function testInventoryPoolDefaultAccessManager01_setSignatureThreshold_success() public {
         uint16 newSignatureThreshold = 3;
 
@@ -506,6 +724,26 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
         vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, validator1, accessManager.DEFAULT_ADMIN_ROLE()));
         accessManager.setSignatureThreshold(newSignatureThreshold, new bytes[](0));
         vm.stopPrank();
+    }
+
+    function testInventoryPoolDefaultAccessManager01_setSignatureThreshold_nonValidatorSignatureReverts() public {
+        uint16 newSignatureThreshold = 3;
+
+        bytes32 digest = accessManager.hashTypedData(keccak256(abi.encode(
+            accessManager.SET_SIGNATURE_THRESHOLD_TYPEHASH(),
+            newSignatureThreshold
+        )));
+
+        uint256[] memory privKeys = new uint256[](2);
+        privKeys[0] = validator1_pk;
+        privKeys[1] = 0x999; // Random private key for non-validator
+        address nonValidator = vm.addr(privKeys[1]);
+
+        bytes[] memory signatures = getSignaturesFromKeys(digest, privKeys);
+
+        vm.prank(admin);
+        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, nonValidator, VALIDATOR_ROLE));
+        accessManager.setSignatureThreshold(newSignatureThreshold, signatures);
     }
 
     // Role management tests
