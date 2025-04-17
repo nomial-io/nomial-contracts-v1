@@ -104,6 +104,17 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
         );
     }
 
+    function testInventoryPoolDefaultAccessManager01_constructor_zeroValidatorsReverts() public {
+        address[] memory emptyValidators = new address[](0);
+        
+        vm.expectRevert(InventoryPoolDefaultAccessManager01.ZeroValidatorsNotAllowed.selector);
+        new InventoryPoolDefaultAccessManager01(
+            admin,
+            emptyValidators,
+            1
+        );
+    }
+
     function testInventoryPoolDefaultAccessManager01_borrow_success() public {
         InventoryPool01 pool = wethInventoryPool;
         uint amount = 1 * 10**18;
@@ -697,6 +708,35 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
         vm.prank(admin);
         vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, nonValidator, VALIDATOR_ROLE));
         accessManager.removeValidator(validator3, newSignatureThreshold, signatures);
+    }
+
+    function testInventoryPoolDefaultAccessManager01_removeValidator_lastValidatorReverts() public {
+        // Setup: Create a contract with just one validator
+        address[] memory singleValidator = new address[](1);
+        singleValidator[0] = validator1;
+        InventoryPoolDefaultAccessManager01 singleValidatorContract = new InventoryPoolDefaultAccessManager01(
+            admin,
+            singleValidator,
+            1
+        );
+
+        // Create signature for removing the validator
+        bytes32 digest = singleValidatorContract.hashTypedData(
+            keccak256(abi.encode(
+                singleValidatorContract.REMOVE_VALIDATOR_TYPEHASH(),
+                validator1,
+                uint16(1)
+            ))
+        );
+
+        uint256[] memory privKeys = new uint256[](1);
+        privKeys[0] = validator1_pk;
+        bytes[] memory signatures = getSignaturesFromKeys(digest, privKeys);
+
+        // Attempt to remove the last validator
+        vm.prank(admin);
+        vm.expectRevert(InventoryPoolDefaultAccessManager01.ZeroValidatorsNotAllowed.selector);
+        singleValidatorContract.removeValidator(validator1, 1, signatures);
     }
 
     function testInventoryPoolDefaultAccessManager01_setSignatureThreshold_success() public {

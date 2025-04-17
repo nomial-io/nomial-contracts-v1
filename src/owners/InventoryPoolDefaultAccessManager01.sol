@@ -45,7 +45,7 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, EIP712 
     error ValidatorNotUnique(address validator);
     error ValidatorExists(address validator);
     error ValidatorDoesNotExist(address validator);
-
+    error ZeroValidatorsNotAllowed();
     // Track used signatures to prevent replay
     mapping(bytes32 => bool) public usedSigHashes;
 
@@ -65,6 +65,9 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, EIP712 
     constructor(address admin, address[] memory validators, uint16 signatureThreshold_) EIP712("InventoryPoolDefaultAccessManager01", "1") {
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         validatorCount = uint16(validators.length);
+        if (validatorCount == 0) {
+            revert ZeroValidatorsNotAllowed();
+        }
         for (uint i = 0; i < validators.length; i++) {
             _grantValidatorRole(validators[i]);
         }
@@ -258,6 +261,10 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, EIP712 
      * @param signatures Array of validator signatures
      */
     function removeValidator(address validator, uint16 newSignatureThreshold, bytes[] calldata signatures) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (validatorCount == 1) {
+            revert ZeroValidatorsNotAllowed();
+        }
+
         bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(REMOVE_VALIDATOR_TYPEHASH, validator, newSignatureThreshold)));
         _validateSignatures(digest, signatures);
 
