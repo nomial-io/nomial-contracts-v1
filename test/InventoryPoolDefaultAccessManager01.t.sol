@@ -10,7 +10,7 @@ import {InventoryPoolDeployer01} from "../src/deployment/InventoryPoolDeployer01
 import {OwnableParamsDeployer01} from "../src/deployment/OwnableParamsDeployer01.sol";
 import {NomialDeployer01} from "../src/deployment/NomialDeployer01.sol";
 import {OwnableParams01} from "../src/OwnableParams01.sol";
-import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
@@ -225,6 +225,73 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
         vm.stopPrank();
     }
 
+    function testInventoryPoolDefaultAccessManager01_upgradeParamsContract_success() public {
+        OwnableParams01 newParams = new OwnableParams01(
+            defaultBaseFee,
+            defaultRate1,
+            defaultPenaltyRate,
+            defaultPenaltyPeriod,
+            address(accessManager)
+        );
+
+        bytes32 digest = accessManager.hashTypedData(keccak256(abi.encode(
+            accessManager.UPGRADE_PARAMS_CONTRACT_TYPEHASH(),
+            wethInventoryPool,
+            newParams
+        )));
+        bytes[] memory signatures = getValidatorSignatures(digest);
+
+        vm.startPrank(admin);
+        vm.expectEmit(true, true, true, true);
+        emit IInventoryPool01.ParamsContractUpgraded(newParams);
+        accessManager.upgradeParamsContract(wethInventoryPool, newParams, signatures);
+        vm.stopPrank();
+    }
+
+    function testInventoryPoolDefaultAccessManager01_overwriteCoreState_success() public {
+        uint storedAccInterestFactor = 100;
+        uint lastAccumulatedInterestUpdate = 200;
+        uint scaledReceivables = 300;
+
+        bytes32 digest = accessManager.hashTypedData(keccak256(abi.encode(
+            accessManager.OVERWRITE_CORE_STATE_TYPEHASH(),
+            wethInventoryPool,
+            storedAccInterestFactor,
+            lastAccumulatedInterestUpdate,
+            scaledReceivables
+        )));
+        bytes[] memory signatures = getValidatorSignatures(digest);
+
+        vm.startPrank(admin);
+        accessManager.overwriteCoreState(
+            wethInventoryPool,
+            storedAccInterestFactor,
+            lastAccumulatedInterestUpdate,
+            scaledReceivables,
+            signatures
+        );
+        assertEq(wethInventoryPool.storedAccInterestFactor(), storedAccInterestFactor);
+        assertEq(wethInventoryPool.lastAccumulatedInterestUpdate(), lastAccumulatedInterestUpdate);
+        assertEq(wethInventoryPool.scaledReceivables(), scaledReceivables);
+        vm.stopPrank();
+    }
+
+    function testInventoryPoolDefaultAccessManager01_transferOwnership_success() public {
+        address newOwner = address(0x123);
+        bytes32 digest = accessManager.hashTypedData(keccak256(abi.encode(
+            accessManager.TRANSFER_OWNERSHIP_TYPEHASH(),
+            wethInventoryPool,
+            newOwner
+        )));
+        bytes[] memory signatures = getValidatorSignatures(digest);
+
+        vm.startPrank(admin);
+        vm.expectEmit(true, true, false, true);
+        emit Ownable.OwnershipTransferred(address(accessManager), newOwner);
+        accessManager.transferOwnership(wethInventoryPool, newOwner, signatures);
+        vm.stopPrank();
+    }
+
     function testInventoryPoolDefaultAccessManager01_updateInterestRate_onlyCallableByAdmin() public {
         vm.startPrank(validator1);
         vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, validator1, accessManager.DEFAULT_ADMIN_ROLE()));
@@ -257,6 +324,35 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
         vm.startPrank(validator1);
         vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, validator1, accessManager.DEFAULT_ADMIN_ROLE()));
         accessManager.updateBaseFee(ownableParams, 100, new bytes[](0));
+        vm.stopPrank();
+    }
+
+    function testInventoryPoolDefaultAccessManager01_upgradeParamsContract_onlyCallableByAdmin() public {
+        OwnableParams01 newParams = new OwnableParams01(
+            defaultBaseFee,
+            defaultRate1,
+            defaultPenaltyRate,
+            defaultPenaltyPeriod,
+            address(accessManager)
+        );
+
+        vm.startPrank(validator1);
+        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, validator1, accessManager.DEFAULT_ADMIN_ROLE()));
+        accessManager.upgradeParamsContract(wethInventoryPool, newParams, new bytes[](0));
+        vm.stopPrank();
+    }
+
+    function testInventoryPoolDefaultAccessManager01_overwriteCoreState_onlyCallableByAdmin() public {
+        vm.startPrank(validator1);
+        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, validator1, accessManager.DEFAULT_ADMIN_ROLE()));
+        accessManager.overwriteCoreState(wethInventoryPool, 100, 200, block.timestamp, new bytes[](0));
+        vm.stopPrank();
+    }
+
+    function testInventoryPoolDefaultAccessManager01_transferOwnership_onlyCallableByAdmin() public {
+        vm.startPrank(validator1);
+        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, validator1, accessManager.DEFAULT_ADMIN_ROLE()));
+        accessManager.transferOwnership(wethInventoryPool, address(0x123), new bytes[](0));
         vm.stopPrank();
     }
 }
