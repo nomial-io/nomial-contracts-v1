@@ -35,6 +35,7 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
     address public validator3 = vm.addr(validator3_pk);
 
     address[] public validators = [validator1, validator2, validator3];
+    address[] public borrowers = [borrower];
     uint16 public signatureThreshold = 2;
 
     InventoryPoolDeployer01 public poolDeployer;
@@ -63,7 +64,7 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
         WETH_ERC20.approve(address(poolDeployer), MAX_UINT);
         (address payable wethPoolAddress,,address payable wethPoolAccessManager_) = nomialDeployer.deploy(
             salt2,
-            abi.encode(admin, validators, signatureThreshold),
+            abi.encode(admin, validators, borrowers, signatureThreshold),
             abi.encode(defaultBaseFee, defaultRate1, defaultPenaltyRate, defaultPenaltyPeriod),
             abi.encode(IERC20(WETH), "nomialWETH", "nmlWETH", 1 * 10**14),
             WETH_WHALE
@@ -87,6 +88,10 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
             assertTrue(accessManager.hasRole(accessManager.VALIDATOR_ROLE(), validators[i]), "Validator should have validator role");
         }
 
+        for (uint i = 0; i < borrowers.length; i++) {
+            assertTrue(accessManager.hasRole(accessManager.BORROWER_ROLE(), borrowers[i]), "Borrower should have borrower role");
+        }
+
         assertTrue(accessManager.signatureThreshold() == signatureThreshold, "Signature threshold should be set");
     }
 
@@ -100,6 +105,7 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
         new InventoryPoolDefaultAccessManager01(
             admin,
             duplicateValidators,
+            borrowers,
             signatureThreshold
         );
     }
@@ -111,6 +117,7 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
         new InventoryPoolDefaultAccessManager01(
             admin,
             emptyValidators,
+            borrowers,
             1
         );
     }
@@ -717,6 +724,7 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
         InventoryPoolDefaultAccessManager01 singleValidatorContract = new InventoryPoolDefaultAccessManager01(
             admin,
             singleValidator,
+            borrowers,
             1
         );
 
@@ -850,5 +858,117 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
         privKeys[0] = validator1_pk;
         privKeys[1] = validator2_pk;
         return getSignaturesFromKeys(digest, privKeys);
+    }
+
+    function testInventoryPoolDefaultAccessManager01_addBorrower_success() public {
+        address newBorrower = address(0x456);
+
+        bytes32 digest = accessManager.hashTypedData(keccak256(abi.encode(
+            accessManager.ADD_BORROWER_TYPEHASH(),
+            newBorrower
+        )));
+        bytes[] memory signatures = getValidatorSignatures(digest);
+
+        vm.startPrank(admin);
+        accessManager.addBorrower(newBorrower, signatures);
+        vm.stopPrank();
+
+        assertTrue(accessManager.hasRole(accessManager.BORROWER_ROLE(), newBorrower), "New borrower should have borrower role");
+    }
+
+    function testInventoryPoolDefaultAccessManager01_addBorrower_onlyCallableByAdmin() public {
+        address newBorrower = address(0x456);
+
+        vm.startPrank(validator1);
+        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, validator1, accessManager.DEFAULT_ADMIN_ROLE()));
+        accessManager.addBorrower(newBorrower, new bytes[](0));
+        vm.stopPrank();
+    }
+
+    function testInventoryPoolDefaultAccessManager01_addBorrower_existingBorrowerReverts() public {
+        bytes32 digest = accessManager.hashTypedData(keccak256(abi.encode(
+            accessManager.ADD_BORROWER_TYPEHASH(),
+            borrower
+        )));
+        bytes[] memory signatures = getValidatorSignatures(digest);
+
+        vm.startPrank(admin);
+        vm.expectRevert(abi.encodeWithSelector(InventoryPoolDefaultAccessManager01.BorrowerExists.selector, borrower));
+        accessManager.addBorrower(borrower, signatures);
+        vm.stopPrank();
+    }
+
+    function testInventoryPoolDefaultAccessManager01_addBorrower_nonValidatorSignatureReverts() public {
+        address newBorrower = address(0x456);
+
+        bytes32 digest = accessManager.hashTypedData(keccak256(abi.encode(
+            accessManager.ADD_BORROWER_TYPEHASH(),
+            newBorrower
+        )));
+
+        uint256[] memory privKeys = new uint256[](2);
+        privKeys[0] = validator1_pk;
+        privKeys[1] = 0x999; // Random private key for non-validator
+        address nonValidator = vm.addr(privKeys[1]);
+
+        bytes[] memory signatures = getSignaturesFromKeys(digest, privKeys);
+
+        vm.prank(admin);
+        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, nonValidator, VALIDATOR_ROLE));
+        accessManager.addBorrower(newBorrower, signatures);
+    }
+
+    function testInventoryPoolDefaultAccessManager01_removeBorrower_success() public {
+        bytes32 digest = accessManager.hashTypedData(keccak256(abi.encode(
+            accessManager.REMOVE_BORROWER_TYPEHASH(),
+            borrower
+        )));
+        bytes[] memory signatures = getValidatorSignatures(digest);
+
+        vm.startPrank(admin);
+        accessManager.removeBorrower(borrower, signatures);
+        vm.stopPrank();
+
+        assertFalse(accessManager.hasRole(accessManager.BORROWER_ROLE(), borrower), "Removed borrower should not have borrower role");
+    }
+
+    function testInventoryPoolDefaultAccessManager01_removeBorrower_onlyCallableByAdmin() public {
+        vm.startPrank(validator1);
+        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, validator1, accessManager.DEFAULT_ADMIN_ROLE()));
+        accessManager.removeBorrower(borrower, new bytes[](0));
+        vm.stopPrank();
+    }
+
+    function testInventoryPoolDefaultAccessManager01_removeBorrower_nonBorrowerReverts() public {
+        address nonBorrower = address(0x789);
+
+        bytes32 digest = accessManager.hashTypedData(keccak256(abi.encode(
+            accessManager.REMOVE_BORROWER_TYPEHASH(),
+            nonBorrower
+        )));
+        bytes[] memory signatures = getValidatorSignatures(digest);
+
+        vm.startPrank(admin);
+        vm.expectRevert(abi.encodeWithSelector(InventoryPoolDefaultAccessManager01.BorrowerDoesNotExist.selector, nonBorrower));
+        accessManager.removeBorrower(nonBorrower, signatures);
+        vm.stopPrank();
+    }
+
+    function testInventoryPoolDefaultAccessManager01_removeBorrower_nonValidatorSignatureReverts() public {
+        bytes32 digest = accessManager.hashTypedData(keccak256(abi.encode(
+            accessManager.REMOVE_BORROWER_TYPEHASH(),
+            borrower
+        )));
+
+        uint256[] memory privKeys = new uint256[](2);
+        privKeys[0] = validator1_pk;
+        privKeys[1] = 0x999; // Random private key for non-validator
+        address nonValidator = vm.addr(privKeys[1]);
+
+        bytes[] memory signatures = getSignaturesFromKeys(digest, privKeys);
+
+        vm.prank(admin);
+        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, nonValidator, VALIDATOR_ROLE));
+        accessManager.removeBorrower(borrower, signatures);
     }
 }

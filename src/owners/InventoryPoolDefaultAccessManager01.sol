@@ -20,11 +20,14 @@ import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol"
  */
 contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, EIP712 {
     bytes32 public constant VALIDATOR_ROLE = keccak256("VALIDATOR_ROLE");
+    bytes32 public constant BORROWER_ROLE = keccak256("BORROWER_ROLE");
 
     bytes32 public constant BORROW_TYPEHASH = keccak256("Borrow(address pool,address borrower,uint256 amount,address recipient,uint256 expiry,uint256 chainId,bytes32 salt)");
     bytes32 public constant FORGIVE_DEBT_TYPEHASH = keccak256("ForgiveDebt(address pool,uint256 amount,address borrower)");
     bytes32 public constant ADD_VALIDATOR_TYPEHASH = keccak256("AddValidator(address validator,uint16 signatureThreshold)");
     bytes32 public constant REMOVE_VALIDATOR_TYPEHASH = keccak256("RemoveValidator(address validator,uint16 signatureThreshold)");
+    bytes32 public constant ADD_BORROWER_TYPEHASH = keccak256("AddBorrower(address borrower)");
+    bytes32 public constant REMOVE_BORROWER_TYPEHASH = keccak256("RemoveBorrower(address borrower)");
     bytes32 public constant UPDATE_BASE_FEE_TYPEHASH = keccak256("UpdateBaseFee(address paramsContract,uint256 newBaseFee)");
     bytes32 public constant UPDATE_INTEREST_RATE_TYPEHASH = keccak256("UpdateInterestRate(address paramsContract,uint256 newInterestRate)");
     bytes32 public constant UPDATE_PENALTY_RATE_TYPEHASH = keccak256("UpdatePenaltyRate(address paramsContract,uint256 newPenaltyRate)");
@@ -45,7 +48,10 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, EIP712 
     error ValidatorNotUnique(address validator);
     error ValidatorExists(address validator);
     error ValidatorDoesNotExist(address validator);
+    error BorrowerExists(address borrower);
+    error BorrowerDoesNotExist(address borrower);
     error ZeroValidatorsNotAllowed();
+
     // Track used signatures to prevent replay
     mapping(bytes32 => bool) public usedSigHashes;
 
@@ -60,9 +66,10 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, EIP712 
      * than half the number of validators.
      * @param admin Address to be granted the DEFAULT_ADMIN_ROLE
      * @param validators Array of addresses to be granted the VALIDATOR_ROLE
+     * @param borrowers Array of addresses to be granted the BORROWER_ROLE
      * @param signatureThreshold_ The minimum number of validator signatures required for operations
      */
-    constructor(address admin, address[] memory validators, uint16 signatureThreshold_) EIP712("InventoryPoolDefaultAccessManager01", "1") {
+    constructor(address admin, address[] memory validators, address[] memory borrowers, uint16 signatureThreshold_) EIP712("InventoryPoolDefaultAccessManager01", "1") {
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         validatorCount = uint16(validators.length);
         if (validatorCount == 0) {
@@ -70,6 +77,9 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, EIP712 
         }
         for (uint i = 0; i < validators.length; i++) {
             _grantValidatorRole(validators[i]);
+        }
+        for (uint i = 0; i < borrowers.length; i++) {
+            _grantBorrowerRole(borrowers[i]);
         }
         _setSignatureThreshold(signatureThreshold_);
     }
@@ -274,6 +284,32 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, EIP712 
     }
 
     /**
+     * @notice Adds a new borrower to the system
+     * @dev Requires signatures from the threshold number of validators. Can only be called by DEFAULT_ADMIN_ROLE
+     * @param borrower Address to be granted the BORROWER_ROLE
+     * @param signatures Array of validator signatures
+     */
+    function addBorrower(address borrower, bytes[] calldata signatures) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(ADD_BORROWER_TYPEHASH, borrower)));
+        _validateSignatures(digest, signatures);
+
+        _grantBorrowerRole(borrower);
+    }
+
+    /**
+     * @notice Removes a borrower from the system
+     * @dev Requires signatures from the threshold number of validators. Can only be called by DEFAULT_ADMIN_ROLE
+     * @param borrower Address to have BORROWER_ROLE revoked
+     * @param signatures Array of validator signatures
+     */
+    function removeBorrower(address borrower, bytes[] calldata signatures) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(REMOVE_BORROWER_TYPEHASH, borrower)));
+        _validateSignatures(digest, signatures);
+
+        _revokeBorrowerRole(borrower);
+    }
+
+    /**
      * @notice Sets the signature threshold
      * @dev Requires signatures from the threshold number of validators. Can only be called by DEFAULT_ADMIN_ROLE
      * @param newSignatureThreshold The new signature threshold to set
@@ -379,6 +415,30 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, EIP712 
     function _revokeValidatorRole(address validator) internal {
         if(!_revokeRole(VALIDATOR_ROLE, validator)) {
             revert ValidatorDoesNotExist(validator);
+        }
+    }
+
+    /**
+     * @notice Internal function to grant the borrower role to an address
+     * @dev Wraps AccessControl._grantRole
+     * @param borrower The address to be granted the borrower role
+     * @custom:revert BorrowerExists If the address already has the borrower role
+     */
+    function _grantBorrowerRole(address borrower) internal {
+        if(!_grantRole(BORROWER_ROLE, borrower)) {
+            revert BorrowerExists(borrower);
+        }
+    }
+
+    /**
+     * @notice Internal function to revoke the borrower role from an address
+     * @dev Wraps AccessControl._revokeRole
+     * @param borrower The address to have the borrower role revoked
+     * @custom:revert BorrowerDoesNotExist If the address does not have the borrower role
+     */
+    function _revokeBorrowerRole(address borrower) internal {
+        if(!_revokeRole(BORROWER_ROLE, borrower)) {
+            revert BorrowerDoesNotExist(borrower);
         }
     }
 }

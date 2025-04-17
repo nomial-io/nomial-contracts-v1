@@ -39,6 +39,7 @@ contract InventoryPool01Test is Test, Helper {
     bytes32 public constant salt4 = hex'3b9eaf8ca13209dab364d64ca37e15568026112dda9f5dd8d3519338ae882fd7';
 
     address[] public validators = [address(7), address(8), address(9)];
+    address[] public borrowers = [address(10), address(11), address(12)];
     uint16 public signatureThreshold = 2;
 
     uint constant WAD = 1e18;
@@ -62,7 +63,7 @@ contract InventoryPool01Test is Test, Helper {
         USDC_ERC20.approve(address(poolDeployer), MAX_UINT);
         (address payable usdcPoolAddress,,address payable usdcPoolAccessManager_) = nomialDeployer.deploy(
             salt1,
-            abi.encode(accessManagerAdmin, validators, signatureThreshold),
+            abi.encode(accessManagerAdmin, validators, borrowers, signatureThreshold),
             abi.encode(defaultBaseFee, defaultBaseRate, defaultRate1, defaultRate2, defaultOptimalUtilizationRate, defaultPenaltyRate, defaultPenaltyPeriod),
             abi.encode(IERC20(USDC), "nomialUSDC", "nmlUSDC", 1 * 10**5),
             USDC_WHALE
@@ -76,7 +77,7 @@ contract InventoryPool01Test is Test, Helper {
         WETH_ERC20.approve(address(poolDeployer), MAX_UINT);
         (address payable wethPoolAddress,,address payable wethPoolAccessManager_) = nomialDeployer.deploy(
             salt2,
-            abi.encode(accessManagerAdmin, validators, signatureThreshold),
+            abi.encode(accessManagerAdmin, validators, borrowers, signatureThreshold),
             abi.encode(defaultBaseFee, defaultBaseRate, defaultRate1, defaultRate2, defaultOptimalUtilizationRate, defaultPenaltyRate, defaultPenaltyPeriod),
             abi.encode(IERC20(WETH), "nomialWETH", "nmlWETH", 1 * 10**14),
             WETH_WHALE
@@ -97,7 +98,7 @@ contract InventoryPool01Test is Test, Helper {
         ST_ETH_ERC20.approve(address(poolDeployer), MAX_UINT);
         (address payable stEthPoolAddress,,) = nomialDeployer.deploy(
             salt3,
-            abi.encode(accessManagerAdmin, validators, signatureThreshold),
+            abi.encode(accessManagerAdmin, validators, borrowers, signatureThreshold),
             abi.encode(defaultBaseFee, defaultBaseRate, defaultRate1, defaultRate2, defaultOptimalUtilizationRate, defaultPenaltyRate, defaultPenaltyPeriod),
             abi.encode(IERC20(ST_ETH), "nomialSTETH", "nmlSTETH", depositAmount),
             ST_ETH_WHALE
@@ -116,7 +117,7 @@ contract InventoryPool01Test is Test, Helper {
         ST_ETH_ERC20.approve(address(poolDeployer), MAX_UINT);
         (address payable stEthPoolAddress,,) = nomialDeployer.deploy(
             salt3,
-            abi.encode(accessManagerAdmin, validators, signatureThreshold),
+            abi.encode(accessManagerAdmin, validators, borrowers, signatureThreshold),
             abi.encode(defaultBaseFee, defaultBaseRate, defaultRate1, defaultRate2, defaultOptimalUtilizationRate, defaultPenaltyRate, defaultPenaltyPeriod),
             abi.encode(IERC20(ST_ETH), "nomialSTETH", "nmlSTETH", depositAmount),
             ST_ETH_WHALE

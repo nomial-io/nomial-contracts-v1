@@ -22,6 +22,7 @@ contract ValidateSignaturesTest is Test, Helper {
     address public nonValidator;
     
     address[] public validators;
+    address[] public borrowers;
     uint16 public constant signatureThreshold = 2;
     bytes32 public constant VALIDATOR_ROLE = keccak256("VALIDATOR_ROLE");
 
@@ -39,6 +40,7 @@ contract ValidateSignaturesTest is Test, Helper {
         validateSignatures = new ValidateSignaturesMock(
             admin,
             validators,
+            borrowers,
             signatureThreshold
         );
     }

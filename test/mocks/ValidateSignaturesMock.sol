@@ -7,8 +7,9 @@ contract ValidateSignaturesMock is InventoryPoolDefaultAccessManager01 {
     constructor(
         address admin,
         address[] memory validators,
-        uint16 signatureThreshold
-    ) InventoryPoolDefaultAccessManager01(admin, validators, signatureThreshold) {}
+        address[] memory borrowers,
+        uint16 signatureThreshold   
+    ) InventoryPoolDefaultAccessManager01(admin, validators, borrowers, signatureThreshold) {}
 
     function validateSignatures(bytes32 digest, bytes[] calldata signatures) external {
         _validateSignatures(digest, signatures);
