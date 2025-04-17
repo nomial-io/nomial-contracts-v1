@@ -8,8 +8,8 @@ import {IInventoryPool01} from "../src/interfaces/IInventoryPool01.sol";
 import {InventoryPoolDefaultAccessManagerDeployer01} from "../src/deployment/InventoryPoolDefaultAccessManagerDeployer01.sol";
 import {InventoryPoolDeployer01} from "../src/deployment/InventoryPoolDeployer01.sol";
 import {OwnableParamsDeployer01} from "../src/deployment/OwnableParamsDeployer01.sol";
-import {UtilizationBasedRateParamsDeployer01} from "../src/deployment/UtilizationBasedRateParamsDeployer01.sol";
 import {NomialDeployer01} from "../src/deployment/NomialDeployer01.sol";
+import {OwnableParams01} from "../src/OwnableParams01.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
@@ -39,23 +39,22 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
 
     InventoryPoolDeployer01 public poolDeployer;
     OwnableParamsDeployer01 public ownableParamsDeployer;
-    UtilizationBasedRateParamsDeployer01 public utilizationBasedParamsDeployer;
     NomialDeployer01 public nomialDeployer;
     InventoryPoolDefaultAccessManagerDeployer01 public accessManagerDeployer;
     InventoryPool01 public wethInventoryPool;
     address public accessManagerAddr;
     InventoryPoolDefaultAccessManager01 public accessManager;
+    OwnableParams01 public ownableParams;
 
     function setUp() public {
         setupAll();
 
         poolDeployer = new InventoryPoolDeployer01();
         ownableParamsDeployer = new OwnableParamsDeployer01();
-        utilizationBasedParamsDeployer = new UtilizationBasedRateParamsDeployer01();
         accessManagerDeployer = new InventoryPoolDefaultAccessManagerDeployer01();
         nomialDeployer = new NomialDeployer01(
             address(poolDeployer),
-            address(utilizationBasedParamsDeployer),
+            address(ownableParamsDeployer),
             address(accessManagerDeployer)
         );
 
@@ -65,7 +64,7 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
         (address payable wethPoolAddress,,address payable wethPoolAccessManager_) = nomialDeployer.deploy(
             salt2,
             abi.encode(admin, validators, signatureThreshold),
-            abi.encode(defaultBaseFee, defaultBaseRate, defaultRate1, defaultRate2, defaultOptimalUtilizationRate, defaultPenaltyRate, defaultPenaltyPeriod),
+            abi.encode(defaultBaseFee, defaultRate1, defaultPenaltyRate, defaultPenaltyPeriod),
             abi.encode(IERC20(WETH), "nomialWETH", "nmlWETH", 1 * 10**14),
             WETH_WHALE
         );
@@ -75,6 +74,8 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
         IERC20(WETH).approve(address(wethInventoryPool), MAX_UINT);
         wethInventoryPool.deposit(1_000 * 10**18, WETH_WHALE);
         vm.stopPrank();
+
+        ownableParams = OwnableParams01(address(wethInventoryPool.params()));
     }
 
     function testInventoryPoolDefaultAccessManager01_constructor() public {
@@ -99,7 +100,7 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
         return signatures;
     }
 
-    function testInventoryPoolDefaultAccessManager01_borrow() public {
+    function testInventoryPoolDefaultAccessManager01_borrow_success() public {
         InventoryPool01 pool = wethInventoryPool;
         uint amount = 1 * 10**18;
         uint expiry = block.timestamp + 100;
@@ -123,7 +124,7 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
         accessManager.borrow(pool, amount, recipient, expiry, salt, signatures);
     }
 
-    function testInventoryPoolDefaultAccessManager01_forgiveDebt() public {
+    function testInventoryPoolDefaultAccessManager01_forgiveDebt_success() public {
         // First create a borrow position
         InventoryPool01 pool = wethInventoryPool;
         uint borrowAmount = 1 * 10**18;
@@ -167,10 +168,95 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
         vm.stopPrank();
     }
 
+    function testInventoryPoolDefaultAccessManager01_updateBaseFee_success() public {
+        uint newBaseFee = 100;
+        bytes32 digest = accessManager.hashTypedData(keccak256(abi.encode(
+            accessManager.UPDATE_BASE_FEE_TYPEHASH(),
+            ownableParams,
+            newBaseFee
+        )));
+        bytes[] memory signatures = getValidatorSignatures(digest);
+        vm.prank(admin);
+        vm.expectEmit(true, true, true, true);
+        emit OwnableParams01.BaseFeeUpdated(defaultBaseFee, newBaseFee);
+        accessManager.updateBaseFee(ownableParams, newBaseFee, signatures);
+    }
+
+    function testInventoryPoolDefaultAccessManager01_updateInterestRate_success() public {
+        uint newInterestRate = 100;
+        bytes32 digest = accessManager.hashTypedData(keccak256(abi.encode(
+            accessManager.UPDATE_INTEREST_RATE_TYPEHASH(),
+            ownableParams,
+            newInterestRate
+        )));
+        bytes[] memory signatures = getValidatorSignatures(digest);
+        vm.prank(admin);
+        vm.expectEmit(true, true, true, true);
+        emit OwnableParams01.InterestRateUpdated(defaultRate1, newInterestRate);
+        accessManager.updateInterestRate(ownableParams, newInterestRate, signatures);
+    }
+
+    function testInventoryPoolDefaultAccessManager01_updatePenaltyRate_success() public {
+        uint newPenaltyRate = 100;
+        bytes32 digest = accessManager.hashTypedData(keccak256(abi.encode(
+            accessManager.UPDATE_PENALTY_RATE_TYPEHASH(),
+            ownableParams,
+            newPenaltyRate
+        )));
+        bytes[] memory signatures = getValidatorSignatures(digest);
+        vm.prank(admin);
+        vm.expectEmit(true, true, true, true);
+        emit OwnableParams01.PenaltyRateUpdated(defaultPenaltyRate, newPenaltyRate);
+        accessManager.updatePenaltyRate(ownableParams, newPenaltyRate, signatures);
+    }
+
+    function testInventoryPoolDefaultAccessManager01_updatePenaltyPeriod_success() public {
+        uint newPenaltyPeriod = 100;
+        bytes32 digest = accessManager.hashTypedData(keccak256(abi.encode(
+            accessManager.UPDATE_PENALTY_PERIOD_TYPEHASH(),
+            ownableParams,
+            newPenaltyPeriod
+        )));
+        bytes[] memory signatures = getValidatorSignatures(digest);
+        vm.startPrank(admin);
+        vm.expectEmit(true, true, true, true);
+        emit OwnableParams01.PenaltyPeriodUpdated(defaultPenaltyPeriod, newPenaltyPeriod);
+        accessManager.updatePenaltyPeriod(ownableParams, newPenaltyPeriod, signatures);
+        vm.stopPrank();
+    }
+
+    function testInventoryPoolDefaultAccessManager01_updateInterestRate_onlyCallableByAdmin() public {
+        vm.startPrank(validator1);
+        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, validator1, accessManager.DEFAULT_ADMIN_ROLE()));
+        accessManager.updateInterestRate(ownableParams, 100, new bytes[](0));
+        vm.stopPrank();
+    }
+
+    function testInventoryPoolDefaultAccessManager01_updatePenaltyRate_onlyCallableByAdmin() public {
+        vm.startPrank(validator1);
+        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, validator1, accessManager.DEFAULT_ADMIN_ROLE()));
+        accessManager.updatePenaltyRate(ownableParams, 100, new bytes[](0));
+        vm.stopPrank();
+    }
+
+    function testInventoryPoolDefaultAccessManager01_updatePenaltyPeriod_onlyCallableByAdmin() public {
+        vm.startPrank(validator1);
+        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, validator1, accessManager.DEFAULT_ADMIN_ROLE()));
+        accessManager.updatePenaltyPeriod(ownableParams, 100, new bytes[](0));
+        vm.stopPrank();
+    }
+
     function testInventoryPoolDefaultAccessManager01_forgiveDebt_onlyCallableByAdmin() public {
         vm.startPrank(validator1);
-        vm.expectRevert(abi.encodeWithSignature("AccessControlUnauthorizedAccount(address,bytes32)", validator1, accessManager.DEFAULT_ADMIN_ROLE()));
+        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, validator1, accessManager.DEFAULT_ADMIN_ROLE()));
         accessManager.forgiveDebt(wethInventoryPool, 1 * 10**18, borrower, new bytes[](0));
         vm.stopPrank();
     }
-} 
+
+    function testInventoryPoolDefaultAccessManager01_updateBaseFee_onlyCallableByAdmin() public {
+        vm.startPrank(validator1);
+        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, validator1, accessManager.DEFAULT_ADMIN_ROLE()));
+        accessManager.updateBaseFee(ownableParams, 100, new bytes[](0));
+        vm.stopPrank();
+    }
+}
