@@ -37,6 +37,7 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, EIP712 
 
     error SignatureUsed(bytes32 sigHash);
     error SignatureThresholdTooLow(uint16 newSignatureThreshold, uint16 validatorCount);
+    error SignatureThresholdTooHigh(uint16 newSignatureThreshold, uint16 validatorCount);
     error GrantRoleNotAllowed();
     error RevokeRoleNotAllowed();
     error RenounceRoleNotAllowed();
@@ -341,6 +342,8 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, EIP712 
     function _setSignatureThreshold(uint16 newSignatureThreshold) internal {
         if (newSignatureThreshold <= validatorCount / 2) {
             revert SignatureThresholdTooLow(newSignatureThreshold, validatorCount);
+        } else if (newSignatureThreshold > validatorCount) {
+            revert SignatureThresholdTooHigh(newSignatureThreshold, validatorCount);
         }
         signatureThreshold = newSignatureThreshold;
 
