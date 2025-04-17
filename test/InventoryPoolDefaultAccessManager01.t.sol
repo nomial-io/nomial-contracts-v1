@@ -104,16 +104,6 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
         );
     }
 
-    // Helper function to get 2 validator signatures
-    function getValidatorSignatures(bytes32 digest) internal pure returns (bytes[] memory) {
-        bytes[] memory signatures = new bytes[](2);
-        (uint8 v1, bytes32 r1, bytes32 s1) = vm.sign(validator1_pk, digest);
-        (uint8 v2, bytes32 r2, bytes32 s2) = vm.sign(validator2_pk, digest);
-        signatures[0] = abi.encodePacked(r1, s1, v1);
-        signatures[1] = abi.encodePacked(r2, s2, v2);
-        return signatures;
-    }
-
     function testInventoryPoolDefaultAccessManager01_borrow_success() public {
         InventoryPool01 pool = wethInventoryPool;
         uint amount = 1 * 10**18;
@@ -182,6 +172,13 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
         vm.stopPrank();
     }
 
+    function testInventoryPoolDefaultAccessManager01_forgiveDebt_onlyCallableByAdmin() public {
+        vm.startPrank(validator1);
+        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, validator1, accessManager.DEFAULT_ADMIN_ROLE()));
+        accessManager.forgiveDebt(wethInventoryPool, 1 * 10**18, borrower, new bytes[](0));
+        vm.stopPrank();
+    }
+
     function testInventoryPoolDefaultAccessManager01_updateBaseFee_success() public {
         uint newBaseFee = 100;
         bytes32 digest = accessManager.hashTypedData(keccak256(abi.encode(
@@ -196,6 +193,14 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
         accessManager.updateBaseFee(ownableParams, newBaseFee, signatures);
     }
 
+    function testInventoryPoolDefaultAccessManager01_updateBaseFee_onlyCallableByAdmin() public {
+        vm.startPrank(validator1);
+        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, validator1, accessManager.DEFAULT_ADMIN_ROLE()));
+        accessManager.updateBaseFee(ownableParams, 100, new bytes[](0));
+        vm.stopPrank();
+    }
+
+    // Update interest rate tests
     function testInventoryPoolDefaultAccessManager01_updateInterestRate_success() public {
         uint newInterestRate = 100;
         bytes32 digest = accessManager.hashTypedData(keccak256(abi.encode(
@@ -208,6 +213,13 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
         vm.expectEmit(true, true, true, true);
         emit OwnableParams01.InterestRateUpdated(defaultRate1, newInterestRate);
         accessManager.updateInterestRate(ownableParams, newInterestRate, signatures);
+    }
+
+    function testInventoryPoolDefaultAccessManager01_updateInterestRate_onlyCallableByAdmin() public {
+        vm.startPrank(validator1);
+        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, validator1, accessManager.DEFAULT_ADMIN_ROLE()));
+        accessManager.updateInterestRate(ownableParams, 100, new bytes[](0));
+        vm.stopPrank();
     }
 
     function testInventoryPoolDefaultAccessManager01_updatePenaltyRate_success() public {
@@ -224,6 +236,14 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
         accessManager.updatePenaltyRate(ownableParams, newPenaltyRate, signatures);
     }
 
+    function testInventoryPoolDefaultAccessManager01_updatePenaltyRate_onlyCallableByAdmin() public {
+        vm.startPrank(validator1);
+        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, validator1, accessManager.DEFAULT_ADMIN_ROLE()));
+        accessManager.updatePenaltyRate(ownableParams, 100, new bytes[](0));
+        vm.stopPrank();
+    }
+
+    // Update penalty period tests
     function testInventoryPoolDefaultAccessManager01_updatePenaltyPeriod_success() public {
         uint newPenaltyPeriod = 100;
         bytes32 digest = accessManager.hashTypedData(keccak256(abi.encode(
@@ -236,6 +256,13 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
         vm.expectEmit(true, true, true, true);
         emit OwnableParams01.PenaltyPeriodUpdated(defaultPenaltyPeriod, newPenaltyPeriod);
         accessManager.updatePenaltyPeriod(ownableParams, newPenaltyPeriod, signatures);
+        vm.stopPrank();
+    }
+
+    function testInventoryPoolDefaultAccessManager01_updatePenaltyPeriod_onlyCallableByAdmin() public {
+        vm.startPrank(validator1);
+        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, validator1, accessManager.DEFAULT_ADMIN_ROLE()));
+        accessManager.updatePenaltyPeriod(ownableParams, 100, new bytes[](0));
         vm.stopPrank();
     }
 
@@ -259,6 +286,21 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
         vm.expectEmit(true, true, true, true);
         emit IInventoryPool01.ParamsContractUpgraded(newParams);
         accessManager.upgradeParamsContract(wethInventoryPool, newParams, signatures);
+        vm.stopPrank();
+    }
+
+    function testInventoryPoolDefaultAccessManager01_upgradeParamsContract_onlyCallableByAdmin() public {
+        OwnableParams01 newParams = new OwnableParams01(
+            defaultBaseFee,
+            defaultRate1,
+            defaultPenaltyRate,
+            defaultPenaltyPeriod,
+            address(accessManager)
+        );
+
+        vm.startPrank(validator1);
+        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, validator1, accessManager.DEFAULT_ADMIN_ROLE()));
+        accessManager.upgradeParamsContract(wethInventoryPool, newParams, new bytes[](0));
         vm.stopPrank();
     }
 
@@ -290,6 +332,13 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
         vm.stopPrank();
     }
 
+    function testInventoryPoolDefaultAccessManager01_overwriteCoreState_onlyCallableByAdmin() public {
+        vm.startPrank(validator1);
+        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, validator1, accessManager.DEFAULT_ADMIN_ROLE()));
+        accessManager.overwriteCoreState(wethInventoryPool, 100, 200, block.timestamp, new bytes[](0));
+        vm.stopPrank();
+    }
+
     function testInventoryPoolDefaultAccessManager01_transferOwnership_success() public {
         address newOwner = address(0x123);
         bytes32 digest = accessManager.hashTypedData(keccak256(abi.encode(
@@ -303,6 +352,13 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
         vm.expectEmit(true, true, false, true);
         emit Ownable.OwnershipTransferred(address(accessManager), newOwner);
         accessManager.transferOwnership(wethInventoryPool, newOwner, signatures);
+        vm.stopPrank();
+    }
+
+    function testInventoryPoolDefaultAccessManager01_transferOwnership_onlyCallableByAdmin() public {
+        vm.startPrank(validator1);
+        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, validator1, accessManager.DEFAULT_ADMIN_ROLE()));
+        accessManager.transferOwnership(wethInventoryPool, address(0x123), new bytes[](0));
         vm.stopPrank();
     }
 
@@ -324,6 +380,16 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
         assertTrue(accessManager.hasRole(VALIDATOR_ROLE, newValidator), "New validator should have validator role");
         assertEq(accessManager.validatorCount(), 4, "Validator count should be incremented");
         assertEq(accessManager.signatureThreshold(), newSignatureThreshold, "Signature threshold should be updated");
+    }
+
+    function testInventoryPoolDefaultAccessManager01_addValidator_onlyCallableByAdmin() public {
+        address newValidator = address(0x456);
+        uint16 newSignatureThreshold = 3;
+
+        vm.startPrank(validator1);
+        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, validator1, accessManager.DEFAULT_ADMIN_ROLE()));
+        accessManager.addValidator(newValidator, newSignatureThreshold, new bytes[](0));
+        vm.stopPrank();
     }
 
     function testInventoryPoolDefaultAccessManager01_addValidator_existingValidatorReverts() public {
@@ -361,6 +427,15 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
         assertEq(accessManager.signatureThreshold(), newSignatureThreshold, "Signature threshold should be updated");
     }
 
+    function testInventoryPoolDefaultAccessManager01_removeValidator_onlyCallableByAdmin() public {
+        uint16 newSignatureThreshold = 2;
+
+        vm.startPrank(validator1);
+        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, validator1, accessManager.DEFAULT_ADMIN_ROLE()));
+        accessManager.removeValidator(validator2, newSignatureThreshold, new bytes[](0));
+        vm.stopPrank();
+    }
+
     function testInventoryPoolDefaultAccessManager01_removeValidator_nonValidatorReverts() public {
         address nonValidator = address(0x789);
         uint16 newSignatureThreshold = 2;
@@ -396,89 +471,6 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
         assertEq(accessManager.signatureThreshold(), newSignatureThreshold, "Signature threshold should be updated");
     }
 
-    function testInventoryPoolDefaultAccessManager01_updateInterestRate_onlyCallableByAdmin() public {
-        vm.startPrank(validator1);
-        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, validator1, accessManager.DEFAULT_ADMIN_ROLE()));
-        accessManager.updateInterestRate(ownableParams, 100, new bytes[](0));
-        vm.stopPrank();
-    }
-
-    function testInventoryPoolDefaultAccessManager01_updatePenaltyRate_onlyCallableByAdmin() public {
-        vm.startPrank(validator1);
-        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, validator1, accessManager.DEFAULT_ADMIN_ROLE()));
-        accessManager.updatePenaltyRate(ownableParams, 100, new bytes[](0));
-        vm.stopPrank();
-    }
-
-    function testInventoryPoolDefaultAccessManager01_updatePenaltyPeriod_onlyCallableByAdmin() public {
-        vm.startPrank(validator1);
-        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, validator1, accessManager.DEFAULT_ADMIN_ROLE()));
-        accessManager.updatePenaltyPeriod(ownableParams, 100, new bytes[](0));
-        vm.stopPrank();
-    }
-
-    function testInventoryPoolDefaultAccessManager01_forgiveDebt_onlyCallableByAdmin() public {
-        vm.startPrank(validator1);
-        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, validator1, accessManager.DEFAULT_ADMIN_ROLE()));
-        accessManager.forgiveDebt(wethInventoryPool, 1 * 10**18, borrower, new bytes[](0));
-        vm.stopPrank();
-    }
-
-    function testInventoryPoolDefaultAccessManager01_updateBaseFee_onlyCallableByAdmin() public {
-        vm.startPrank(validator1);
-        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, validator1, accessManager.DEFAULT_ADMIN_ROLE()));
-        accessManager.updateBaseFee(ownableParams, 100, new bytes[](0));
-        vm.stopPrank();
-    }
-
-    function testInventoryPoolDefaultAccessManager01_upgradeParamsContract_onlyCallableByAdmin() public {
-        OwnableParams01 newParams = new OwnableParams01(
-            defaultBaseFee,
-            defaultRate1,
-            defaultPenaltyRate,
-            defaultPenaltyPeriod,
-            address(accessManager)
-        );
-
-        vm.startPrank(validator1);
-        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, validator1, accessManager.DEFAULT_ADMIN_ROLE()));
-        accessManager.upgradeParamsContract(wethInventoryPool, newParams, new bytes[](0));
-        vm.stopPrank();
-    }
-
-    function testInventoryPoolDefaultAccessManager01_overwriteCoreState_onlyCallableByAdmin() public {
-        vm.startPrank(validator1);
-        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, validator1, accessManager.DEFAULT_ADMIN_ROLE()));
-        accessManager.overwriteCoreState(wethInventoryPool, 100, 200, block.timestamp, new bytes[](0));
-        vm.stopPrank();
-    }
-
-    function testInventoryPoolDefaultAccessManager01_transferOwnership_onlyCallableByAdmin() public {
-        vm.startPrank(validator1);
-        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, validator1, accessManager.DEFAULT_ADMIN_ROLE()));
-        accessManager.transferOwnership(wethInventoryPool, address(0x123), new bytes[](0));
-        vm.stopPrank();
-    }
-
-    function testInventoryPoolDefaultAccessManager01_addValidator_onlyCallableByAdmin() public {
-        address newValidator = address(0x456);
-        uint16 newSignatureThreshold = 3;
-
-        vm.startPrank(validator1);
-        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, validator1, accessManager.DEFAULT_ADMIN_ROLE()));
-        accessManager.addValidator(newValidator, newSignatureThreshold, new bytes[](0));
-        vm.stopPrank();
-    }
-
-    function testInventoryPoolDefaultAccessManager01_removeValidator_onlyCallableByAdmin() public {
-        uint16 newSignatureThreshold = 2;
-
-        vm.startPrank(validator1);
-        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, validator1, accessManager.DEFAULT_ADMIN_ROLE()));
-        accessManager.removeValidator(validator2, newSignatureThreshold, new bytes[](0));
-        vm.stopPrank();
-    }
-
     function testInventoryPoolDefaultAccessManager01_setSignatureThreshold_onlyCallableByAdmin() public {
         uint16 newSignatureThreshold = 3;
 
@@ -488,6 +480,7 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
         vm.stopPrank();
     }
 
+    // Role management tests
     function testInventoryPoolDefaultAccessManager01_grantRole_reverts() public {
         vm.startPrank(admin);
         vm.expectRevert(InventoryPoolDefaultAccessManager01.GrantRoleNotAllowed.selector);
@@ -507,5 +500,15 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
         vm.expectRevert(InventoryPoolDefaultAccessManager01.RenounceRoleNotAllowed.selector);
         accessManager.renounceRole(VALIDATOR_ROLE, validator1);
         vm.stopPrank();
+    }
+
+    // Helper function to get 2 validator signatures
+    function getValidatorSignatures(bytes32 digest) internal pure returns (bytes[] memory) {
+        bytes[] memory signatures = new bytes[](2);
+        (uint8 v1, bytes32 r1, bytes32 s1) = vm.sign(validator1_pk, digest);
+        (uint8 v2, bytes32 r2, bytes32 s2) = vm.sign(validator2_pk, digest);
+        signatures[0] = abi.encodePacked(r1, s1, v1);
+        signatures[1] = abi.encodePacked(r2, s2, v2);
+        return signatures;
     }
 }
