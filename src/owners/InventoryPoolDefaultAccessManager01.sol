@@ -39,6 +39,7 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, EIP712 
     error SignatureThresholdTooLow(uint16 newSignatureThreshold, uint16 validatorCount);
     error GrantRoleNotAllowed();
     error RevokeRoleNotAllowed();
+    error RenounceRoleNotAllowed();
     error InvalidSignatureCount(uint validSignatures, uint requiredSignatures);
     error ValidatorNotUnique(address validator);
 
@@ -218,12 +219,16 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, EIP712 
         ownedContract.transferOwnership(newOwner);
     }
 
-    function grantRole(bytes32 role, address account) public virtual override(AccessControl, IAccessControl) onlyRole(getRoleAdmin(role)) {
+    function grantRole(bytes32 role, address account) public virtual override(AccessControl, IAccessControl) {
         revert GrantRoleNotAllowed();
     }
 
-    function revokeRole(bytes32 role, address account) public virtual override(AccessControl, IAccessControl) onlyRole(getRoleAdmin(role)) {
+    function revokeRole(bytes32 role, address account) public virtual override(AccessControl, IAccessControl) {
         revert RevokeRoleNotAllowed();
+    }
+
+    function renounceRole(bytes32 role, address account) public virtual override(AccessControl, IAccessControl) {
+        revert RenounceRoleNotAllowed();
     }
 
     /**

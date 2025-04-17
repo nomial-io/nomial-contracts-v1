@@ -383,4 +383,25 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
         accessManager.setSignatureThreshold(newSignatureThreshold, new bytes[](0));
         vm.stopPrank();
     }
+
+    function testInventoryPoolDefaultAccessManager01_grantRole_reverts() public {
+        vm.startPrank(admin);
+        vm.expectRevert(InventoryPoolDefaultAccessManager01.GrantRoleNotAllowed.selector);
+        accessManager.grantRole(VALIDATOR_ROLE, address(0x123));
+        vm.stopPrank();
+    }
+
+    function testInventoryPoolDefaultAccessManager01_revokeRole_reverts() public {
+        vm.startPrank(admin);
+        vm.expectRevert(InventoryPoolDefaultAccessManager01.RevokeRoleNotAllowed.selector);
+        accessManager.revokeRole(VALIDATOR_ROLE, validator1);
+        vm.stopPrank();
+    }
+
+    function testInventoryPoolDefaultAccessManager01_renounceRole_reverts() public {
+        vm.startPrank(validator1);
+        vm.expectRevert(InventoryPoolDefaultAccessManager01.RenounceRoleNotAllowed.selector);
+        accessManager.renounceRole(VALIDATOR_ROLE, validator1);
+        vm.stopPrank();
+    }
 }
