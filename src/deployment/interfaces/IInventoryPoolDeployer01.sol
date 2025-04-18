@@ -7,24 +7,18 @@ interface IInventoryPoolDeployer01 {
     event PoolDeployed(address pool);
     error FailedToDeployPool();
 
-    function deployPool(
-        bytes32 salt,
-        IERC20 asset,
-        string calldata name,
-        string calldata symbol,
-        uint initAmount,
-        address owner,
-        address paramsAddr,
-        address poolFunder
-    ) external returns (address payable);
-
     function deployPoolAddress(
         bytes32 salt,
-        IERC20 asset,
-        string calldata name,
-        string calldata symbol,
-        uint initAmount,
         address owner,
-        address paramsAddr
+        address paramsAddr,
+        bytes calldata poolArgs
     ) external view returns (address payable addr, bytes memory bytecode);
+
+    function deployPool(
+        bytes32 salt,
+        address owner,
+        address paramsAddr,
+        address poolFunder,
+        bytes calldata poolArgs
+    ) external returns (address payable);
 }

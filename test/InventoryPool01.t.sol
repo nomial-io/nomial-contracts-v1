@@ -12,6 +12,7 @@ import "../src/deployment/InventoryPoolDeployer01.sol";
 import "../src/deployment/UtilizationBasedRateParamsDeployer01.sol";
 import "../src/deployment/OwnableParamsDeployer01.sol";
 import "../src/deployment/NomialDeployer01.sol";
+import "../src/deployment/InventoryPoolDefaultAccessManagerDeployer01.sol";
 import "./Helper.sol";
 
 contract InventoryPool01Test is Test, Helper {
@@ -21,17 +22,25 @@ contract InventoryPool01Test is Test, Helper {
     OwnableParamsDeployer01 public ownableParamsDeployer;
     UtilizationBasedRateParamsDeployer01 public utilizationBasedParamsDeployer;
     NomialDeployer01 public nomialDeployer;
+    InventoryPoolDefaultAccessManagerDeployer01 public accessManagerDeployer;
     InventoryPool01 public usdcInventoryPool;
     InventoryPool01 public wethInventoryPool;
+    address public usdcPoolAccessManager;
+    address public wethPoolAccessManager;
     
     address public constant addr1 = 0x373FB35c5068f49deF8C2A74C0Fb3a82df02C667;
     address public constant addr2 = 0x5Df7C65332BB095B7b108336A4f4eC7E98D66a61;
     address public constant addr3 = 0x380f7480935b3Fb4FD604eC1Becf1361DaFD600f;
-    address public constant poolOwner = 0xFD1066acf2FC47F3b2DaCec43E76321644dC9928;
+    address public constant accessManagerAdmin = 0xFD1066acf2FC47F3b2DaCec43E76321644dC9928;
+    address public constant owner = 0x5c2570F07563788d2f9A1EA2d9d51288a7AaF6A9;
     bytes32 public constant salt1 = hex'a9a8bae2fc8ea91bd701a424b988cbefc6e0f6a459baa63e619bc908fef1ad12';
     bytes32 public constant salt2 = hex'95aa895ea6e2d9a504bd372ed1fcd917bb99e683c487a720fbbb456bd4c0e2bf';
     bytes32 public constant salt3 = hex'ed0461bb6636b9669060a1f83779bb5d660330b2a2cd0d04dd3c22533b24aae3';
     bytes32 public constant salt4 = hex'3b9eaf8ca13209dab364d64ca37e15568026112dda9f5dd8d3519338ae882fd7';
+
+    address[] public validators = [address(7), address(8), address(9)];
+    address[] public borrowers = [address(10), address(11), address(12)];
+    uint16 public signatureThreshold = 2;
 
     uint constant WAD = 1e18;
 
@@ -42,41 +51,39 @@ contract InventoryPool01Test is Test, Helper {
         poolDeployer = new InventoryPoolDeployer01();
         ownableParamsDeployer = new OwnableParamsDeployer01();
         utilizationBasedParamsDeployer = new UtilizationBasedRateParamsDeployer01();
+        accessManagerDeployer = new InventoryPoolDefaultAccessManagerDeployer01();
         nomialDeployer = new NomialDeployer01(
             address(poolDeployer),
-            address(utilizationBasedParamsDeployer)
+            address(utilizationBasedParamsDeployer),
+            address(accessManagerDeployer)
         );
 
         // Deploy USDC pool
         vm.startPrank(USDC_WHALE);
         USDC_ERC20.approve(address(poolDeployer), MAX_UINT);
-        (address payable usdcPoolAddress,) = nomialDeployer.deploy(
+        (address payable usdcPoolAddress,,address payable usdcPoolAccessManager_) = nomialDeployer.deploy(
             salt1,
-            IERC20(USDC),
-            "nomialUSDC",
-            "nmlUSDC",
-            1 * 10**5,
-            poolOwner,
+            abi.encode(accessManagerAdmin, validators, borrowers, signatureThreshold),
             abi.encode(defaultBaseFee, defaultBaseRate, defaultRate1, defaultRate2, defaultOptimalUtilizationRate, defaultPenaltyRate, defaultPenaltyPeriod),
+            abi.encode(IERC20(USDC), "nomialUSDC", "nmlUSDC", 1 * 10**5),
             USDC_WHALE
         );
         usdcInventoryPool = InventoryPool01(usdcPoolAddress);
+        usdcPoolAccessManager = usdcPoolAccessManager_;
         vm.stopPrank();
     
         // Deploy WETH pool
         vm.startPrank(WETH_WHALE);
         WETH_ERC20.approve(address(poolDeployer), MAX_UINT);
-        (address payable wethPoolAddress,) = nomialDeployer.deploy(
+        (address payable wethPoolAddress,,address payable wethPoolAccessManager_) = nomialDeployer.deploy(
             salt2,
-            IERC20(WETH),
-            "nomialWETH",
-            "nmlWETH",
-            1 * 10**14,
-            poolOwner,
+            abi.encode(accessManagerAdmin, validators, borrowers, signatureThreshold),
             abi.encode(defaultBaseFee, defaultBaseRate, defaultRate1, defaultRate2, defaultOptimalUtilizationRate, defaultPenaltyRate, defaultPenaltyPeriod),
+            abi.encode(IERC20(WETH), "nomialWETH", "nmlWETH", 1 * 10**14),
             WETH_WHALE
         );
         wethInventoryPool = InventoryPool01(wethPoolAddress);
+        wethPoolAccessManager = wethPoolAccessManager_;
         vm.stopPrank();
 
         vm.prank(WETH_WHALE);
@@ -89,14 +96,11 @@ contract InventoryPool01Test is Test, Helper {
 
         vm.startPrank(ST_ETH_WHALE);
         ST_ETH_ERC20.approve(address(poolDeployer), MAX_UINT);
-        (address payable stEthPoolAddress,) = nomialDeployer.deploy(
+        (address payable stEthPoolAddress,,) = nomialDeployer.deploy(
             salt3,
-            IERC20(ST_ETH),
-            "nomialSTETH",
-            "nmlSTETH",
-            depositAmount,
-            poolOwner,
+            abi.encode(accessManagerAdmin, validators, borrowers, signatureThreshold),
             abi.encode(defaultBaseFee, defaultBaseRate, defaultRate1, defaultRate2, defaultOptimalUtilizationRate, defaultPenaltyRate, defaultPenaltyPeriod),
+            abi.encode(IERC20(ST_ETH), "nomialSTETH", "nmlSTETH", depositAmount),
             ST_ETH_WHALE
         );
         vm.stopPrank();
@@ -111,14 +115,11 @@ contract InventoryPool01Test is Test, Helper {
 
         vm.startPrank(ST_ETH_WHALE);
         ST_ETH_ERC20.approve(address(poolDeployer), MAX_UINT);
-        (address payable stEthPoolAddress,) = nomialDeployer.deploy(
+        (address payable stEthPoolAddress,,) = nomialDeployer.deploy(
             salt3,
-            IERC20(ST_ETH),
-            "nomialSTETH",
-            "nmlSTETH",
-            depositAmount,
-            poolOwner,
+            abi.encode(accessManagerAdmin, validators, borrowers, signatureThreshold),
             abi.encode(defaultBaseFee, defaultBaseRate, defaultRate1, defaultRate2, defaultOptimalUtilizationRate, defaultPenaltyRate, defaultPenaltyPeriod),
+            abi.encode(IERC20(ST_ETH), "nomialSTETH", "nmlSTETH", depositAmount),
             ST_ETH_WHALE
         );
         vm.stopPrank();
@@ -133,7 +134,7 @@ contract InventoryPool01Test is Test, Helper {
         wethInventoryPool.deposit(1_000 * 10**18, addr1);
 
         vm.warp(TEST_TIMESTAMP);
-        vm.prank(poolOwner);
+        vm.prank(wethPoolAccessManager);
         vm.expectRevert(abi.encodeWithSelector(IInventoryPool01.WrongChainId.selector, block.chainid + 1));
         wethInventoryPool.borrow(1*10**18, addr1, addr2, TEST_TIMESTAMP + 1 days, block.chainid + 1);
     }
@@ -144,7 +145,7 @@ contract InventoryPool01Test is Test, Helper {
         wethInventoryPool.deposit(1_000 * 10**18, addr1);
 
         vm.warp(TEST_TIMESTAMP);
-        vm.prank(poolOwner);
+        vm.prank(wethPoolAccessManager);
         vm.expectRevert(IInventoryPool01.Expired.selector);
         wethInventoryPool.borrow(1*10**18, addr1, addr2, TEST_TIMESTAMP - 1, block.chainid);
     }
@@ -159,7 +160,7 @@ contract InventoryPool01Test is Test, Helper {
         
         uint baseFee = wethInventoryPool.params().baseFee();
         
-        vm.startPrank(poolOwner);
+        vm.startPrank(wethPoolAccessManager);
         wethInventoryPool.borrow(borrowAmount, addr1, addr2, TEST_TIMESTAMP + 1 days, block.chainid);
         vm.stopPrank();
 
@@ -181,7 +182,7 @@ contract InventoryPool01Test is Test, Helper {
         uint borrowAmount = 100 * 10**18;
         vm.warp(TEST_TIMESTAMP);
         
-        vm.startPrank(poolOwner);
+        vm.startPrank(wethPoolAccessManager);
         wethInventoryPool.borrow(borrowAmount, addr1, addr2, TEST_TIMESTAMP + 1 days, block.chainid);
         vm.stopPrank();
 
@@ -207,7 +208,7 @@ contract InventoryPool01Test is Test, Helper {
         uint borrowAmount = 100 * 10**6;
         vm.warp(TEST_TIMESTAMP);
         
-        vm.startPrank(poolOwner);
+        vm.startPrank(usdcPoolAccessManager);
         usdcInventoryPool.borrow(borrowAmount, addr1, addr2, TEST_TIMESTAMP + 1 days, block.chainid);
         vm.stopPrank();
 
@@ -231,7 +232,7 @@ contract InventoryPool01Test is Test, Helper {
         uint borrowAmount = 100 * 10**18;
         vm.warp(TEST_TIMESTAMP);
         
-        vm.startPrank(poolOwner);
+        vm.startPrank(wethPoolAccessManager);
         wethInventoryPool.borrow(borrowAmount, addr1, addr2, TEST_TIMESTAMP + 1 days, block.chainid);
         vm.stopPrank();
 
@@ -282,12 +283,12 @@ contract InventoryPool01Test is Test, Helper {
     // Verifies borrowed assets are transferred to recipient
     function testInventoryPool01_borrow_transferToRecipient() public {
         vm.prank(WETH_WHALE);
-        wethInventoryPool.deposit(1_000 * 10**18, poolOwner);
+        wethInventoryPool.deposit(1_000 * 10**18, WETH_WHALE);
 
         uint borrowAmount = 1 * 10**18;
         uint recipientInitialBalance = IERC20(WETH).balanceOf(addr2);
 
-        vm.prank(poolOwner);
+        vm.prank(wethPoolAccessManager);
         wethInventoryPool.borrow(borrowAmount, addr1, addr2, TEST_TIMESTAMP + 1 days, block.chainid);
 
         uint recipientFinalBalance = IERC20(WETH).balanceOf(addr2);
@@ -297,7 +298,7 @@ contract InventoryPool01Test is Test, Helper {
     // Verifies Borrowed event is emitted with correct parameters
     function testInventoryPool01_borrow_emitEvent() public {
         vm.prank(WETH_WHALE);
-        wethInventoryPool.deposit(1_000 * 10**18, poolOwner);
+        wethInventoryPool.deposit(1_000 * 10**18, WETH_WHALE);
 
         uint borrowAmount = 1 * 10**18;
         vm.warp(TEST_TIMESTAMP);
@@ -305,19 +306,19 @@ contract InventoryPool01Test is Test, Helper {
         vm.expectEmit(true, true, false, true, address(wethInventoryPool));
         emit IInventoryPool01.Borrowed(addr1, addr2, borrowAmount);
 
-        vm.prank(poolOwner);
+        vm.prank(wethPoolAccessManager);
         wethInventoryPool.borrow(borrowAmount, addr1, addr2, TEST_TIMESTAMP + 1 days, block.chainid);
     }
 
     // Tests interest rate changes with different utilization levels
     function testInventoryPool01_borrow_variableInterestRate() public {
         vm.prank(WETH_WHALE);
-        wethInventoryPool.deposit(1_000 * 10**18, poolOwner);
+        wethInventoryPool.deposit(1_000 * 10**18, WETH_WHALE);
 
         vm.warp(TEST_TIMESTAMP);
 
         // borrow at very low utilization and interestRate
-        vm.prank(poolOwner);
+        vm.prank(wethPoolAccessManager);
         wethInventoryPool.borrow(1 * 10**18, addr1, addr1, TEST_TIMESTAMP + 1 days, block.chainid);
 
         uint interestRate1 = wethInventoryPool.params().interestRate(wethInventoryPool.utilizationRate());
@@ -331,8 +332,8 @@ contract InventoryPool01Test is Test, Helper {
         assertEq(addr1Debt, addr1ExpectedDebt, "Expected debt after 1 hour at interestRate1 should match");
 
         // Large borrow to increase utilization and interestRate
-        vm.startPrank(poolOwner);
-        wethInventoryPool.borrow(250 * 10**18, poolOwner, poolOwner, TEST_TIMESTAMP + 1 days, block.chainid);
+        vm.startPrank(wethPoolAccessManager);
+        wethInventoryPool.borrow(250 * 10**18, WETH_WHALE, WETH_WHALE, TEST_TIMESTAMP + 1 days, block.chainid);
         wethInventoryPool.borrow(3 * 10**18, addr2, addr2, TEST_TIMESTAMP + 1 days, block.chainid);
         vm.stopPrank();
 
@@ -359,9 +360,9 @@ contract InventoryPool01Test is Test, Helper {
     // Verifies repay fails with zero amount
     function testInventoryPool01_repay_zeroRepayment() public {
         vm.prank(WETH_WHALE);
-        wethInventoryPool.deposit(1_000 * 10**18, poolOwner);
+        wethInventoryPool.deposit(1_000 * 10**18, WETH_WHALE);
 
-        vm.prank(poolOwner);
+        vm.prank(wethPoolAccessManager);
         wethInventoryPool.borrow(1 * 10**18, addr1, addr1, TEST_TIMESTAMP + 1 days, block.chainid);
 
         vm.expectRevert(IInventoryPool01.ZeroRepayment.selector);
@@ -371,7 +372,7 @@ contract InventoryPool01Test is Test, Helper {
     // Verifies repay fails when borrower has no debt
     function testInventoryPool01_repay_noDebt() public {
         vm.prank(WETH_WHALE);
-        wethInventoryPool.deposit(1_000 * 10**18, poolOwner);
+        wethInventoryPool.deposit(1_000 * 10**18, WETH_WHALE);
 
         vm.expectRevert(IInventoryPool01.NoDebt.selector);
         wethInventoryPool.repay(1 * 10**18, addr1);
@@ -380,11 +381,11 @@ contract InventoryPool01Test is Test, Helper {
     // Tests repayment of base debt
     function testInventoryPool01_repay_baseDebt() public {
         vm.prank(WETH_WHALE);
-        wethInventoryPool.deposit(1_000 * 10**18, poolOwner);
+        wethInventoryPool.deposit(1_000 * 10**18, WETH_WHALE);
 
         vm.warp(TEST_TIMESTAMP);
         
-        vm.startPrank(poolOwner);
+        vm.startPrank(wethPoolAccessManager);
         wethInventoryPool.borrow(100 * 10**18, addr1, addr1, TEST_TIMESTAMP + 1 days, block.chainid);
         vm.stopPrank();
 
@@ -437,11 +438,11 @@ contract InventoryPool01Test is Test, Helper {
     // Tests partial repayment of penalty debt
     function testInventoryPool01_repay_penaltyDebtPartial() public {
         vm.prank(WETH_WHALE);
-        wethInventoryPool.deposit(1_000 * 10**18, poolOwner);
+        wethInventoryPool.deposit(1_000 * 10**18, WETH_WHALE);
 
         vm.warp(TEST_TIMESTAMP);
         
-        vm.startPrank(poolOwner);
+        vm.startPrank(wethPoolAccessManager);
         wethInventoryPool.borrow(100 * 10**18, addr1, addr1, TEST_TIMESTAMP + 1 days, block.chainid);
         vm.stopPrank();
 
@@ -487,11 +488,11 @@ contract InventoryPool01Test is Test, Helper {
     // Tests exact repayment of penalty debt
     function testInventoryPool01_repay_penaltyDebtExact() public {
         vm.prank(WETH_WHALE);
-        wethInventoryPool.deposit(1_000 * 10**18, poolOwner);
+        wethInventoryPool.deposit(1_000 * 10**18, WETH_WHALE);
 
         vm.warp(TEST_TIMESTAMP);
         
-        vm.startPrank(poolOwner);
+        vm.startPrank(wethPoolAccessManager);
         wethInventoryPool.borrow(100 * 10**18, addr1, addr1, TEST_TIMESTAMP + 1 days, block.chainid);
         vm.stopPrank();
 
@@ -542,11 +543,11 @@ contract InventoryPool01Test is Test, Helper {
     // Tests repaying all penalty debt but too little base debt to get out of penalty state
     function testInventoryPool01_repay_fullPenaltyAndPartialBaseDebt() public {
         vm.prank(WETH_WHALE);
-        wethInventoryPool.deposit(1_000 * 10**18, poolOwner);
+        wethInventoryPool.deposit(1_000 * 10**18, WETH_WHALE);
 
         vm.warp(TEST_TIMESTAMP);
         
-        vm.startPrank(poolOwner);
+        vm.startPrank(wethPoolAccessManager);
         wethInventoryPool.borrow(100 * 10**18, addr1, addr1, TEST_TIMESTAMP + 1 days, block.chainid);
         vm.stopPrank();
 
@@ -622,11 +623,11 @@ contract InventoryPool01Test is Test, Helper {
         vm.warp(TEST_TIMESTAMP);
 
         vm.startPrank(WETH_WHALE);
-        wethInventoryPool.deposit(1_000 * 10**18, poolOwner);
+        wethInventoryPool.deposit(1_000 * 10**18, WETH_WHALE);
         WETH_ERC20.transfer(addr1, 1 * 10**18);
         vm.stopPrank();
         
-        vm.prank(poolOwner);
+        vm.prank(wethPoolAccessManager);
         wethInventoryPool.borrow(100 * 10**18, addr1, addr1, TEST_TIMESTAMP + 1 days, block.chainid);
 
         // Move past penalty period and accrue some penalty debt
@@ -668,11 +669,11 @@ contract InventoryPool01Test is Test, Helper {
         vm.warp(TEST_TIMESTAMP);
 
         vm.startPrank(WETH_WHALE);
-        wethInventoryPool.deposit(1_000 * 10**18, poolOwner);
+        wethInventoryPool.deposit(1_000 * 10**18, WETH_WHALE);
         WETH_ERC20.transfer(addr1, 1 * 10**18);
         vm.stopPrank();
         
-        vm.prank(poolOwner);
+        vm.prank(wethPoolAccessManager);
         wethInventoryPool.borrow(100 * 10**18, addr1, addr1, TEST_TIMESTAMP + 1 days, block.chainid);
 
         uint baseDebt = wethInventoryPool.baseDebt(addr1);
@@ -703,7 +704,7 @@ contract InventoryPool01Test is Test, Helper {
         vm.prank(WETH_WHALE);
         wethInventoryPool.deposit(1_000 * 10**18, addr1);
 
-        vm.prank(poolOwner);
+        vm.prank(wethPoolAccessManager);
         wethInventoryPool.borrow(100 * 10**18, addr1, addr1, TEST_TIMESTAMP + 1 days, block.chainid);
 
         uint preDepositAccInterestFactor = wethInventoryPool.accumulatedInterestFactor();
@@ -721,7 +722,7 @@ contract InventoryPool01Test is Test, Helper {
         vm.prank(WETH_WHALE);
         wethInventoryPool.deposit(1_000 * 10**18, addr1);
 
-        vm.prank(poolOwner);
+        vm.prank(wethPoolAccessManager);
         wethInventoryPool.borrow(100 * 10**18, addr2, addr2, TEST_TIMESTAMP + 1 days, block.chainid);
 
         uint preWithdrawAccInterestFactor = wethInventoryPool.accumulatedInterestFactor();
@@ -739,7 +740,7 @@ contract InventoryPool01Test is Test, Helper {
         vm.prank(WETH_WHALE);
         wethInventoryPool.deposit(1_000 * 10**18, addr1);
 
-        vm.prank(poolOwner);
+        vm.prank(wethPoolAccessManager);
         wethInventoryPool.borrow(900 * 10**18, addr2, addr2, TEST_TIMESTAMP + 1 days, block.chainid);
 
         // Try to withdraw more than available liquidity (1000 - 900 = 100 WETH available)
@@ -751,11 +752,11 @@ contract InventoryPool01Test is Test, Helper {
     // Tests owner's ability to forgive debt without asset transfer
     function testInventoryPool01_forgiveDebt() public {
         vm.prank(WETH_WHALE);
-        wethInventoryPool.deposit(1_000 * 10**18, poolOwner);
+        wethInventoryPool.deposit(1_000 * 10**18, WETH_WHALE);
 
         vm.warp(TEST_TIMESTAMP);
 
-        vm.prank(poolOwner);
+        vm.prank(wethPoolAccessManager);
         wethInventoryPool.borrow(100 * 10**18, addr1, addr1, TEST_TIMESTAMP + 1 days, block.chainid);
 
         uint penaltyPeriod = wethInventoryPool.params().penaltyPeriod();
@@ -770,7 +771,7 @@ contract InventoryPool01Test is Test, Helper {
         vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", addr1));
         wethInventoryPool.forgiveDebt(baseDebt + penaltyDebt, addr1);
 
-        vm.startPrank(poolOwner);
+        vm.startPrank(wethPoolAccessManager);
         
         // Expect both penalty and base debt repayment events
         vm.expectEmit(true, false, false, true, address(wethInventoryPool));
@@ -798,10 +799,10 @@ contract InventoryPool01Test is Test, Helper {
     // Tests owner's ability to upgrade params contract
     function testInventoryPool01_upgradeParamsContract() public {
         // Deploy new params contract
-        vm.startPrank(poolOwner);
+        vm.startPrank(wethPoolAccessManager);
         address payable newParamsAddress = utilizationBasedParamsDeployer.deployParams(
             salt4,
-            poolOwner,
+            owner,
             abi.encode(defaultBaseFee, defaultBaseRate, defaultRate1, defaultRate2, defaultOptimalUtilizationRate, defaultPenaltyRate, defaultPenaltyPeriod)
         );
         
@@ -820,10 +821,10 @@ contract InventoryPool01Test is Test, Helper {
     // Tests non-owner cannot upgrade params contract
     function testInventoryPool01_upgradeParamsContract_notOwner() public {
         // Deploy new params contract
-        vm.prank(poolOwner);
+        vm.prank(owner);
         address payable newParamsAddress = utilizationBasedParamsDeployer.deployParams(
             salt4,
-            poolOwner,
+            owner,
             abi.encode(defaultBaseFee, defaultBaseRate, defaultRate1, defaultRate2, defaultOptimalUtilizationRate, defaultPenaltyRate, defaultPenaltyPeriod)
         );
         
@@ -837,7 +838,7 @@ contract InventoryPool01Test is Test, Helper {
     function testInventoryPool01_upgradeParamsContract_paramsNotChanged() public {
         IInventoryPoolParams01 oldParams = wethInventoryPool.params();
 
-        vm.prank(poolOwner);
+        vm.prank(wethPoolAccessManager);
         vm.expectRevert(IInventoryPool01.ParamsContractNotChanged.selector);
         wethInventoryPool.upgradeParamsContract(oldParams);
     }
@@ -869,11 +870,11 @@ contract InventoryPool01Test is Test, Helper {
 
         // Deploy params with large but reasonable interest rate
         IInventoryPoolParams01 mockParams = IInventoryPoolParams01(ownableParamsDeployer.deployParams(
-            0, poolOwner, abi.encode(defaultBaseFee, largeRate, defaultPenaltyRate, defaultPenaltyPeriod)
+            0, owner, abi.encode(defaultBaseFee, largeRate, defaultPenaltyRate, defaultPenaltyPeriod)
         ));
 
         // upgrade params on weth inventory pool
-        vm.prank(poolOwner);
+        vm.prank(wethPoolAccessManager);
         wethInventoryPool.upgradeParamsContract(mockParams);
 
         // deposit large amount of ETH
@@ -883,7 +884,7 @@ contract InventoryPool01Test is Test, Helper {
         wethInventoryPool.deposit(depositAmount, WETH_WHALE);
         vm.stopPrank();
 
-        vm.startPrank(poolOwner);
+        vm.startPrank(wethPoolAccessManager);
         // borrow 50 thousand ETH, once per day for 10 years (3,650 days)
         for (uint i = 0; i < 3_650; i++) {
             // fast-forward 1 day and borrow 50 thousand ETH
@@ -899,7 +900,7 @@ contract InventoryPool01Test is Test, Helper {
         // Deploy params contract with max uint256 for interest rate
         IInventoryPoolParams01 mockParams = IInventoryPoolParams01(ownableParamsDeployer.deployParams(
             0,
-            poolOwner,
+            owner,
             abi.encode(
                 defaultBaseFee,
                 type(uint).max, // will be capped to InventoryPoolParams01.MAX_INTEREST_RATE
@@ -909,7 +910,7 @@ contract InventoryPool01Test is Test, Helper {
         ));
 
         // upgrade params on weth inventory pool
-        vm.prank(poolOwner);
+        vm.prank(wethPoolAccessManager);
         wethInventoryPool.upgradeParamsContract(mockParams);
 
         // deposit 1000 ETH
@@ -921,7 +922,7 @@ contract InventoryPool01Test is Test, Helper {
         uint yrs = 22;
         for (uint i = 0; i < yrs; i++) {
             vm.warp(block.timestamp + secondsInYear);
-            vm.prank(poolOwner);
+            vm.prank(wethPoolAccessManager);
             wethInventoryPool.borrow(1, addr1, addr1, block.timestamp, block.chainid);
         }
 
@@ -932,8 +933,7 @@ contract InventoryPool01Test is Test, Helper {
         for (uint j = 0; j < numDays + 1; j++) {
             // fast-forward 1 day
             vm.warp(block.timestamp + secondsInDay);
-
-            vm.startPrank(poolOwner);
+            vm.startPrank(wethPoolAccessManager);
             if (j == numDays) {
                 vm.expectRevert();
             }
@@ -957,11 +957,11 @@ contract InventoryPool01Test is Test, Helper {
         
         // Deploy params contract with 80% fixed annual rate and 0 base fee
         IInventoryPoolParams01 mockParams = IInventoryPoolParams01(ownableParamsDeployer.deployParams(
-            0, poolOwner, abi.encode(0, largeRate, defaultPenaltyRate, defaultPenaltyPeriod)
+            0, owner, abi.encode(0, largeRate, defaultPenaltyRate, defaultPenaltyPeriod)
         ));
 
         // upgrade params on weth inventory pool
-        vm.prank(poolOwner);
+        vm.prank(wethPoolAccessManager);
         wethInventoryPool.upgradeParamsContract(mockParams);
 
         // deposit large amount of ETH
@@ -972,18 +972,18 @@ contract InventoryPool01Test is Test, Helper {
         vm.stopPrank();
 
         // addr1 borrows 50 thousand ETH and fast-forwards 1 year
-        vm.prank(poolOwner);
+        vm.prank(wethPoolAccessManager);
         wethInventoryPool.borrow(borrowAmount, addr1, addr1, block.timestamp, block.chainid);
         vm.warp(block.timestamp + 365 days);
         uint addr1BaseDebt1Year = wethInventoryPool.baseDebt(addr1);
 
         // addr2 borrows 50 thousand ETH. _updateAccumulatedInterestFactor() executes every hour for 1 year
-        vm.prank(poolOwner);
+        vm.prank(wethPoolAccessManager);
         wethInventoryPool.borrow(borrowAmount, addr2, addr2, block.timestamp, block.chainid);
         uint initialBlockTimestamp = block.timestamp;
         for (uint i = 0; i < secondsInYear / (1 hours); i++) {
             vm.warp(block.timestamp + 1 hours);
-            vm.prank(poolOwner);
+            vm.prank(wethPoolAccessManager);
             wethInventoryPool.borrow(1, addr3, addr3, block.timestamp, block.chainid);
         }
         uint addr2BaseDebt1Year = wethInventoryPool.baseDebt(addr2);
@@ -1014,7 +1014,7 @@ contract InventoryPool01Test is Test, Helper {
         vm.prank(WETH_WHALE);
         wethInventoryPool.deposit(depositAmount, WETH_WHALE);
 
-        vm.prank(poolOwner);
+        vm.prank(wethPoolAccessManager);
         wethInventoryPool.borrow(borrowAmount, addr1, addr1, block.timestamp + 1 days, block.chainid);
 
         uint utilizationRate = wethInventoryPool.utilizationRate();
@@ -1036,11 +1036,11 @@ contract InventoryPool01Test is Test, Helper {
 
         // Deploy params contract with rate over the max rate and 0 base fee
         IInventoryPoolParams01 mockParams = IInventoryPoolParams01(ownableParamsDeployer.deployParams(
-            0, poolOwner, abi.encode(0, overMaxRate, defaultPenaltyRate, defaultPenaltyPeriod)
+            0, owner, abi.encode(0, overMaxRate, defaultPenaltyRate, defaultPenaltyPeriod)
         ));
 
         // upgrade params on weth inventory pool
-        vm.prank(poolOwner);
+        vm.prank(wethPoolAccessManager);
         wethInventoryPool.upgradeParamsContract(mockParams);
 
         uint rate = wethInventoryPool.interestRate();
@@ -1062,11 +1062,11 @@ contract InventoryPool01Test is Test, Helper {
 
         // Deploy params with large but reasonable interest rate
         IInventoryPoolParams01 mockParams = IInventoryPoolParams01(ownableParamsDeployer.deployParams(
-            0, poolOwner, abi.encode(defaultBaseFee, largeRate, defaultPenaltyRate, defaultPenaltyPeriod)
+            0, owner, abi.encode(defaultBaseFee, largeRate, defaultPenaltyRate, defaultPenaltyPeriod)
         ));
 
         // upgrade params on weth inventory pool
-        vm.prank(poolOwner);
+        vm.prank(wethPoolAccessManager);
         wethInventoryPool.upgradeParamsContract(mockParams);
 
         // deposit large amount of ETH
@@ -1077,7 +1077,7 @@ contract InventoryPool01Test is Test, Helper {
         vm.stopPrank();
 
         // borrow 50 thousand ETH and fast-forward 8 years
-        vm.prank(poolOwner);
+        vm.prank(wethPoolAccessManager);
         wethInventoryPool.borrow(borrowAmount, addr1, addr1, block.timestamp, block.chainid);
         vm.warp(block.timestamp + 8 * 365 days);
 
@@ -1096,7 +1096,7 @@ contract InventoryPool01Test is Test, Helper {
         wethInventoryPool.withdraw(1e18, WETH_WHALE, WETH_WHALE);
 
         // recover from this state by overwriting the core state variables
-        vm.prank(poolOwner);
+        vm.prank(wethPoolAccessManager);
         wethInventoryPool.overwriteCoreState(0, 0, 0);
 
         // withdraw should now work without overflow

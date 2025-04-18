@@ -64,4 +64,13 @@ contract Helper is Test {
         vm.selectFork(fork);
     }
 
+    // Helper function to get signatures from specific private keys
+    function getSignaturesFromKeys(bytes32 digest, uint256[] memory privKeys) public pure returns (bytes[] memory) {
+        bytes[] memory signatures = new bytes[](privKeys.length);
+        for (uint i = 0; i < privKeys.length; i++) {
+            (uint8 v, bytes32 r, bytes32 s) = vm.sign(privKeys[i], digest);
+            signatures[i] = abi.encodePacked(r, s, v);
+        }
+        return signatures;
+    }
 }

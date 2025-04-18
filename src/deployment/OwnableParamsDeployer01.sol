@@ -10,14 +10,14 @@ contract OwnableParamsDeployer01 is IInventoryPoolParamsDeployer01 {
     function deployParamsAddress(
         bytes32 salt,
         address owner,
-        bytes calldata paramsInitData
+        bytes calldata paramsArgs
     ) public view returns (address payable addr, bytes memory bytecode) {
         (
             uint baseFee,
             uint interestRate,
             uint penaltyRate,
             uint penaltyPeriod
-        ) = abi.decode(paramsInitData, (uint, uint, uint, uint));
+        ) = abi.decode(paramsArgs, (uint, uint, uint, uint));
 
         bytecode = abi.encodePacked(
             type(OwnableParams01).creationCode,
@@ -30,9 +30,9 @@ contract OwnableParamsDeployer01 is IInventoryPoolParamsDeployer01 {
     function deployParams(
         bytes32 salt,
         address owner,
-        bytes calldata paramsInitData
+        bytes calldata paramsArgs
     ) public returns (address payable paramsAddress_) {
-        (address payable expectedAddr, bytes memory bytecode) = deployParamsAddress(salt, owner, paramsInitData);
+        (address payable expectedAddr, bytes memory bytecode) = deployParamsAddress(salt, owner, paramsArgs);
 
         assembly {
             paramsAddress_ := create2(0, add(bytecode, 0x20), mload(bytecode), salt)

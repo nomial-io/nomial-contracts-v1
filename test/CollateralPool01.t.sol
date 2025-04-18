@@ -25,7 +25,6 @@ contract CollateralPool01Test is Test, Helper {
         // deploy CollateralPool01
         vm.prank(owner);
         collateralPool = new CollateralPool01(owner, WITHDRAW_PERIOD);
-        console.log("collateralPool", address(collateralPool));
         assertEq(collateralPool.withdrawPeriod(), WITHDRAW_PERIOD, "Withdraw period should be correctly set");
 
         // Transfer WETH to test addresses
