@@ -23,19 +23,19 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, EIP712 
     bytes32 public constant BORROWER_ROLE = keccak256("BORROWER_ROLE");
 
     bytes32 public constant BORROW_TYPEHASH = keccak256("Borrow(address pool,address borrower,uint256 amount,address recipient,uint256 expiry,uint256 chainId,bytes32 salt)");
-    bytes32 public constant FORGIVE_DEBT_TYPEHASH = keccak256("ForgiveDebt(address pool,uint256 amount,address borrower)");
-    bytes32 public constant ADD_VALIDATOR_TYPEHASH = keccak256("AddValidator(address validator,uint16 signatureThreshold)");
-    bytes32 public constant REMOVE_VALIDATOR_TYPEHASH = keccak256("RemoveValidator(address validator,uint16 signatureThreshold)");
-    bytes32 public constant ADD_BORROWER_TYPEHASH = keccak256("AddBorrower(address borrower)");
-    bytes32 public constant REMOVE_BORROWER_TYPEHASH = keccak256("RemoveBorrower(address borrower)");
-    bytes32 public constant UPDATE_BASE_FEE_TYPEHASH = keccak256("UpdateBaseFee(address paramsContract,uint256 newBaseFee)");
-    bytes32 public constant UPDATE_INTEREST_RATE_TYPEHASH = keccak256("UpdateInterestRate(address paramsContract,uint256 newInterestRate)");
-    bytes32 public constant UPDATE_PENALTY_RATE_TYPEHASH = keccak256("UpdatePenaltyRate(address paramsContract,uint256 newPenaltyRate)");
-    bytes32 public constant UPDATE_PENALTY_PERIOD_TYPEHASH = keccak256("UpdatePenaltyPeriod(address paramsContract,uint256 newPenaltyPeriod)");
-    bytes32 public constant UPGRADE_PARAMS_CONTRACT_TYPEHASH = keccak256("UpgradeParamsContract(address pool,address paramsContract)");
-    bytes32 public constant OVERWRITE_CORE_STATE_TYPEHASH = keccak256("OverwriteCoreState(address pool,uint256 newStoredAccInterestFactor,uint256 newLastAccumulatedInterestUpdate,uint256 newScaledReceivables)");
-    bytes32 public constant TRANSFER_OWNERSHIP_TYPEHASH = keccak256("TransferOwnership(address ownedContract,address newOwner)");
-    bytes32 public constant SET_SIGNATURE_THRESHOLD_TYPEHASH = keccak256("SetSignatureThreshold(uint16 newSignatureThreshold)");
+    bytes32 public constant FORGIVE_DEBT_TYPEHASH = keccak256("ForgiveDebt(address pool,uint256 amount,address borrower,bytes32 salt)");
+    bytes32 public constant ADD_VALIDATOR_TYPEHASH = keccak256("AddValidator(address validator,uint16 signatureThreshold,bytes32 salt)");
+    bytes32 public constant REMOVE_VALIDATOR_TYPEHASH = keccak256("RemoveValidator(address validator,uint16 signatureThreshold,bytes32 salt)");
+    bytes32 public constant ADD_BORROWER_TYPEHASH = keccak256("AddBorrower(address borrower,bytes32 salt)");
+    bytes32 public constant REMOVE_BORROWER_TYPEHASH = keccak256("RemoveBorrower(address borrower,bytes32 salt)");
+    bytes32 public constant UPDATE_BASE_FEE_TYPEHASH = keccak256("UpdateBaseFee(address paramsContract,uint256 newBaseFee,bytes32 salt)");
+    bytes32 public constant UPDATE_INTEREST_RATE_TYPEHASH = keccak256("UpdateInterestRate(address paramsContract,uint256 newInterestRate,bytes32 salt)");
+    bytes32 public constant UPDATE_PENALTY_RATE_TYPEHASH = keccak256("UpdatePenaltyRate(address paramsContract,uint256 newPenaltyRate,bytes32 salt)");
+    bytes32 public constant UPDATE_PENALTY_PERIOD_TYPEHASH = keccak256("UpdatePenaltyPeriod(address paramsContract,uint256 newPenaltyPeriod,bytes32 salt)");
+    bytes32 public constant UPGRADE_PARAMS_CONTRACT_TYPEHASH = keccak256("UpgradeParamsContract(address pool,address paramsContract,bytes32 salt)");
+    bytes32 public constant OVERWRITE_CORE_STATE_TYPEHASH = keccak256("OverwriteCoreState(address pool,uint256 newStoredAccInterestFactor,uint256 newLastAccumulatedInterestUpdate,uint256 newScaledReceivables,bytes32 salt)");
+    bytes32 public constant TRANSFER_OWNERSHIP_TYPEHASH = keccak256("TransferOwnership(address ownedContract,address newOwner,bytes32 salt)");
+    bytes32 public constant SET_SIGNATURE_THRESHOLD_TYPEHASH = keccak256("SetSignatureThreshold(uint16 newSignatureThreshold,bytes32 salt)");
 
     event SignatureThresholdUpdated(uint16 newSignatureThreshold);
 
@@ -117,15 +117,17 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, EIP712 
      * @param pool The inventory pool where the debt exists
      * @param amount The amount of debt to forgive
      * @param borrower The borrower whose debt should be forgiven
+     * @param salt Value to ensure digest is unique
      * @param signatures Array of validator signatures
      */
     function forgiveDebt(
         InventoryPool01 pool,
         uint amount,
         address borrower,
+        bytes32 salt,
         bytes[] calldata signatures
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(FORGIVE_DEBT_TYPEHASH, pool, amount, borrower)));
+        bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(FORGIVE_DEBT_TYPEHASH, pool, amount, borrower, salt)));
         _validateSignatures(digest, signatures);
 
         pool.forgiveDebt(amount, borrower);
@@ -136,10 +138,11 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, EIP712 
      * @dev Requires signatures from the threshold number of validators. Can only be called by DEFAULT_ADMIN_ROLE
      * @param paramsContract The params contract to update
      * @param newBaseFee The new base fee value to set
+     * @param salt Value to ensure digest is unique
      * @param signatures Array of validator signatures
      */
-    function updateBaseFee(OwnableParams01 paramsContract, uint newBaseFee, bytes[] calldata signatures) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(UPDATE_BASE_FEE_TYPEHASH, paramsContract, newBaseFee)));
+    function updateBaseFee(OwnableParams01 paramsContract, uint newBaseFee, bytes32 salt, bytes[] calldata signatures) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(UPDATE_BASE_FEE_TYPEHASH, paramsContract, newBaseFee, salt)));
         _validateSignatures(digest, signatures);
 
         paramsContract.updateBaseFee(newBaseFee);
@@ -150,10 +153,11 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, EIP712 
      * @dev Requires signatures from the threshold number of validators. Can only be called by DEFAULT_ADMIN_ROLE
      * @param paramsContract The params contract to update
      * @param newInterestRate The new interest rate value to set
+     * @param salt Value to ensure digest is unique
      * @param signatures Array of validator signatures
      */
-    function updateInterestRate(OwnableParams01 paramsContract, uint newInterestRate, bytes[] calldata signatures) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(UPDATE_INTEREST_RATE_TYPEHASH, paramsContract, newInterestRate)));
+    function updateInterestRate(OwnableParams01 paramsContract, uint newInterestRate, bytes32 salt, bytes[] calldata signatures) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(UPDATE_INTEREST_RATE_TYPEHASH, paramsContract, newInterestRate, salt)));
         _validateSignatures(digest, signatures);
 
         paramsContract.updateInterestRate(newInterestRate);
@@ -164,10 +168,11 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, EIP712 
      * @dev Requires signatures from the threshold number of validators. Can only be called by DEFAULT_ADMIN_ROLE
      * @param paramsContract The params contract to update
      * @param newPenaltyRate The new penalty rate value to set
+     * @param salt Value to ensure digest is unique
      * @param signatures Array of validator signatures
      */
-    function updatePenaltyRate(OwnableParams01 paramsContract, uint newPenaltyRate, bytes[] calldata signatures) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(UPDATE_PENALTY_RATE_TYPEHASH, paramsContract, newPenaltyRate)));
+    function updatePenaltyRate(OwnableParams01 paramsContract, uint newPenaltyRate, bytes32 salt, bytes[] calldata signatures) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(UPDATE_PENALTY_RATE_TYPEHASH, paramsContract, newPenaltyRate, salt)));
         _validateSignatures(digest, signatures);
 
         paramsContract.updatePenaltyRate(newPenaltyRate);
@@ -178,10 +183,11 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, EIP712 
      * @dev Requires signatures from the threshold number of validators. Can only be called by DEFAULT_ADMIN_ROLE
      * @param paramsContract The params contract to update
      * @param newPenaltyPeriod The new penalty period value to set
+     * @param salt Value to ensure digest is unique
      * @param signatures Array of validator signatures
      */
-    function updatePenaltyPeriod(OwnableParams01 paramsContract, uint newPenaltyPeriod, bytes[] calldata signatures) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(UPDATE_PENALTY_PERIOD_TYPEHASH, paramsContract, newPenaltyPeriod)));
+    function updatePenaltyPeriod(OwnableParams01 paramsContract, uint newPenaltyPeriod, bytes32 salt, bytes[] calldata signatures) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(UPDATE_PENALTY_PERIOD_TYPEHASH, paramsContract, newPenaltyPeriod, salt)));
         _validateSignatures(digest, signatures);
 
         paramsContract.updatePenaltyPeriod(newPenaltyPeriod);
@@ -192,10 +198,11 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, EIP712 
      * @dev Requires signatures from the threshold number of validators. Can only be called by DEFAULT_ADMIN_ROLE
      * @param pool The inventory pool to upgrade
      * @param paramsContract The new params contract to use
+     * @param salt Value to ensure digest is unique
      * @param signatures Array of validator signatures
      */
-    function upgradeParamsContract(InventoryPool01 pool, IInventoryPoolParams01 paramsContract, bytes[] calldata signatures) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(UPGRADE_PARAMS_CONTRACT_TYPEHASH, pool, paramsContract)));
+    function upgradeParamsContract(InventoryPool01 pool, IInventoryPoolParams01 paramsContract, bytes32 salt, bytes[] calldata signatures) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(UPGRADE_PARAMS_CONTRACT_TYPEHASH, pool, paramsContract, salt)));
         _validateSignatures(digest, signatures);
 
         pool.upgradeParamsContract(paramsContract);
@@ -208,15 +215,18 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, EIP712 
      * @param newStoredAccInterestFactor New value for stored accumulated interest factor
      * @param newLastAccumulatedInterestUpdate New value for last accumulated interest update timestamp
      * @param newScaledReceivables New value for scaled receivables
+     * @param salt Value to ensure digest is unique
+     * @param signatures Array of validator signatures
      */
     function overwriteCoreState(
         InventoryPool01 pool,
         uint newStoredAccInterestFactor,
         uint newLastAccumulatedInterestUpdate,
         uint newScaledReceivables,
+        bytes32 salt,
         bytes[] calldata signatures
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(OVERWRITE_CORE_STATE_TYPEHASH, pool, newStoredAccInterestFactor, newLastAccumulatedInterestUpdate, newScaledReceivables)));
+        bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(OVERWRITE_CORE_STATE_TYPEHASH, pool, newStoredAccInterestFactor, newLastAccumulatedInterestUpdate, newScaledReceivables, salt)));
         _validateSignatures(digest, signatures);
 
         pool.overwriteCoreState(newStoredAccInterestFactor, newLastAccumulatedInterestUpdate, newScaledReceivables);
@@ -227,10 +237,11 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, EIP712 
      * @dev Requires signatures from the threshold number of validators. Can only be called by DEFAULT_ADMIN_ROLE
      * @param ownedContract The contract to transfer ownership of
      * @param newOwner The address to transfer ownership to
+     * @param salt Unique value to prevent signature replay
      * @param signatures Array of validator signatures
      */
-    function transferOwnership(Ownable ownedContract, address newOwner, bytes[] calldata signatures) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(TRANSFER_OWNERSHIP_TYPEHASH, ownedContract, newOwner)));
+    function transferOwnership(Ownable ownedContract, address newOwner, bytes32 salt, bytes[] calldata signatures) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(TRANSFER_OWNERSHIP_TYPEHASH, ownedContract, newOwner, salt)));
         _validateSignatures(digest, signatures);
 
         ownedContract.transferOwnership(newOwner);
@@ -253,10 +264,11 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, EIP712 
      * @dev Requires signatures from the threshold number of validators. Can only be called by DEFAULT_ADMIN_ROLE
      * @param validator Address to be granted the VALIDATOR_ROLE
      * @param newSignatureThreshold New signature threshold to set after adding validator
+     * @param salt Value to ensure digest is unique
      * @param signatures Array of validator signatures
      */
-    function addValidator(address validator, uint16 newSignatureThreshold, bytes[] calldata signatures) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(ADD_VALIDATOR_TYPEHASH, validator, newSignatureThreshold)));
+    function addValidator(address validator, uint16 newSignatureThreshold, bytes32 salt, bytes[] calldata signatures) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(ADD_VALIDATOR_TYPEHASH, validator, newSignatureThreshold, salt)));
         _validateSignatures(digest, signatures);
 
         _grantValidatorRole(validator);
@@ -269,14 +281,15 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, EIP712 
      * @dev Requires signatures from the threshold number of validators. Can only be called by DEFAULT_ADMIN_ROLE
      * @param validator Address to have VALIDATOR_ROLE revoked
      * @param newSignatureThreshold New signature threshold to set after removing validator
+     * @param salt Value to ensure digest is unique
      * @param signatures Array of validator signatures
      */
-    function removeValidator(address validator, uint16 newSignatureThreshold, bytes[] calldata signatures) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function removeValidator(address validator, uint16 newSignatureThreshold, bytes32 salt, bytes[] calldata signatures) external onlyRole(DEFAULT_ADMIN_ROLE) {
         if (validatorCount == 1) {
             revert ZeroValidatorsNotAllowed();
         }
 
-        bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(REMOVE_VALIDATOR_TYPEHASH, validator, newSignatureThreshold)));
+        bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(REMOVE_VALIDATOR_TYPEHASH, validator, newSignatureThreshold, salt)));
         _validateSignatures(digest, signatures);
 
         _revokeValidatorRole(validator);
@@ -288,10 +301,11 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, EIP712 
      * @notice Adds a new borrower to the system
      * @dev Requires signatures from the threshold number of validators. Can only be called by DEFAULT_ADMIN_ROLE
      * @param borrower Address to be granted the BORROWER_ROLE
+     * @param salt Value to ensure digest is unique
      * @param signatures Array of validator signatures
      */
-    function addBorrower(address borrower, bytes[] calldata signatures) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(ADD_BORROWER_TYPEHASH, borrower)));
+    function addBorrower(address borrower, bytes32 salt, bytes[] calldata signatures) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(ADD_BORROWER_TYPEHASH, borrower, salt)));
         _validateSignatures(digest, signatures);
 
         _grantBorrowerRole(borrower);
@@ -301,10 +315,11 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, EIP712 
      * @notice Removes a borrower from the system
      * @dev Requires signatures from the threshold number of validators. Can only be called by DEFAULT_ADMIN_ROLE
      * @param borrower Address to have BORROWER_ROLE revoked
+     * @param salt Value to ensure digest is unique
      * @param signatures Array of validator signatures
      */
-    function removeBorrower(address borrower, bytes[] calldata signatures) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(REMOVE_BORROWER_TYPEHASH, borrower)));
+    function removeBorrower(address borrower, bytes32 salt, bytes[] calldata signatures) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(REMOVE_BORROWER_TYPEHASH, borrower, salt)));
         _validateSignatures(digest, signatures);
 
         _revokeBorrowerRole(borrower);
@@ -314,10 +329,11 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, EIP712 
      * @notice Sets the signature threshold
      * @dev Requires signatures from the threshold number of validators. Can only be called by DEFAULT_ADMIN_ROLE
      * @param newSignatureThreshold The new signature threshold to set
+     * @param salt Value to ensure digest is unique
      * @param signatures Array of validator signatures
      */
-    function setSignatureThreshold(uint16 newSignatureThreshold, bytes[] calldata signatures) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(SET_SIGNATURE_THRESHOLD_TYPEHASH, newSignatureThreshold)));
+    function setSignatureThreshold(uint16 newSignatureThreshold, bytes32 salt, bytes[] calldata signatures) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(SET_SIGNATURE_THRESHOLD_TYPEHASH, newSignatureThreshold, salt)));
         _validateSignatures(digest, signatures);
 
         _setSignatureThreshold(newSignatureThreshold);
