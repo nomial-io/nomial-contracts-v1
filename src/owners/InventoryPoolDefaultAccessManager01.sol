@@ -5,6 +5,7 @@ import {AccessControlEnumerable} from "@openzeppelin/contracts/access/extensions
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {IInventoryPoolAccessManager01} from "../interfaces/IInventoryPoolAccessManager01.sol";
 import {IInventoryPoolParams01} from "../interfaces/IInventoryPoolParams01.sol";
 import {OwnableParams01} from "../OwnableParams01.sol";
 import {InventoryPool01} from "../InventoryPool01.sol";
@@ -18,7 +19,7 @@ import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol"
  * is required for all operations. The contract uses EIP-712 for secure message signing and
  * implements replay protection through signature tracking.
  */
-contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, EIP712 {
+contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, IInventoryPoolAccessManager01, EIP712 {
     bytes32 public constant VALIDATOR_ROLE = keccak256("VALIDATOR_ROLE");
     bytes32 public constant BORROWER_ROLE = keccak256("BORROWER_ROLE");
 
@@ -36,22 +37,6 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, EIP712 
     bytes32 public constant OVERWRITE_CORE_STATE_TYPEHASH = keccak256("OverwriteCoreState(address pool,uint256 newStoredAccInterestFactor,uint256 newLastAccumulatedInterestUpdate,uint256 newScaledReceivables,bytes32 salt)");
     bytes32 public constant TRANSFER_OWNERSHIP_TYPEHASH = keccak256("TransferOwnership(address ownedContract,address newOwner,bytes32 salt)");
     bytes32 public constant SET_SIGNATURE_THRESHOLD_TYPEHASH = keccak256("SetSignatureThreshold(uint16 newSignatureThreshold,bytes32 salt)");
-
-    event SignatureThresholdUpdated(uint16 newSignatureThreshold);
-
-    error SignatureUsed(bytes32 sigHash);
-    error SignatureThresholdTooLow(uint16 newSignatureThreshold, uint16 validatorCount);
-    error SignatureThresholdTooHigh(uint16 newSignatureThreshold, uint16 validatorCount);
-    error GrantRoleNotAllowed();
-    error RevokeRoleNotAllowed();
-    error RenounceRoleNotAllowed();
-    error InvalidSignatureCount(uint validSignatures, uint requiredSignatures);
-    error ValidatorNotUnique(address validator);
-    error ValidatorExists(address validator);
-    error ValidatorDoesNotExist(address validator);
-    error BorrowerExists(address borrower);
-    error BorrowerDoesNotExist(address borrower);
-    error ZeroValidatorsNotAllowed();
 
     // Track used signatures to prevent replay
     mapping(bytes32 => bool) public usedSigHashes;

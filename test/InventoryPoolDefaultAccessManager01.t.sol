@@ -2,6 +2,7 @@
 pragma solidity ^0.8.0;
 
 import {Test} from "forge-std/Test.sol";
+import {IInventoryPoolAccessManager01} from "../src/interfaces/IInventoryPoolAccessManager01.sol";
 import {InventoryPoolDefaultAccessManager01} from "../src/owners/InventoryPoolDefaultAccessManager01.sol";
 import {InventoryPool01} from "../src/InventoryPool01.sol";
 import {IInventoryPool01} from "../src/interfaces/IInventoryPool01.sol";
@@ -101,7 +102,7 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
         duplicateValidators[1] = validator2;
         duplicateValidators[2] = validator1; // Duplicate validator1
 
-        vm.expectRevert(abi.encodeWithSelector(InventoryPoolDefaultAccessManager01.ValidatorExists.selector, validator1));
+        vm.expectRevert(abi.encodeWithSelector(IInventoryPoolAccessManager01.ValidatorExists.selector, validator1));
         new InventoryPoolDefaultAccessManager01(
             admin,
             duplicateValidators,
@@ -113,7 +114,7 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
     function testInventoryPoolDefaultAccessManager01_constructor_zeroValidatorsReverts() public {
         address[] memory emptyValidators = new address[](0);
         
-        vm.expectRevert(InventoryPoolDefaultAccessManager01.ZeroValidatorsNotAllowed.selector);
+        vm.expectRevert(IInventoryPoolAccessManager01.ZeroValidatorsNotAllowed.selector);
         new InventoryPoolDefaultAccessManager01(
             admin,
             emptyValidators,
@@ -668,7 +669,7 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
         bytes[] memory signatures = getValidatorSignatures(digest);
 
         vm.startPrank(admin);
-        vm.expectRevert(abi.encodeWithSelector(InventoryPoolDefaultAccessManager01.ValidatorExists.selector, validator1));
+        vm.expectRevert(abi.encodeWithSelector(IInventoryPoolAccessManager01.ValidatorExists.selector, validator1));
         accessManager.addValidator(validator1, newSignatureThreshold, salt1, signatures);
         vm.stopPrank();
     }
@@ -738,7 +739,7 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
         bytes[] memory signatures = getValidatorSignatures(digest);
 
         vm.startPrank(admin);
-        vm.expectRevert(abi.encodeWithSelector(InventoryPoolDefaultAccessManager01.ValidatorDoesNotExist.selector, nonValidator));
+        vm.expectRevert(abi.encodeWithSelector(IInventoryPoolAccessManager01.ValidatorDoesNotExist.selector, nonValidator));
         accessManager.removeValidator(nonValidator, newSignatureThreshold, salt1, signatures);
         vm.stopPrank();
     }
@@ -791,7 +792,7 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
 
         // Attempt to remove the last validator
         vm.prank(admin);
-        vm.expectRevert(InventoryPoolDefaultAccessManager01.ZeroValidatorsNotAllowed.selector);
+        vm.expectRevert(IInventoryPoolAccessManager01.ZeroValidatorsNotAllowed.selector);
         singleValidatorContract.removeValidator(validator1, 1, salt1, signatures);
     }
 
@@ -807,7 +808,7 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
 
         vm.startPrank(admin);
         vm.expectEmit(true, true, true, true);
-        emit InventoryPoolDefaultAccessManager01.SignatureThresholdUpdated(newSignatureThreshold);
+        emit IInventoryPoolAccessManager01.SignatureThresholdUpdated(newSignatureThreshold);
         accessManager.setSignatureThreshold(newSignatureThreshold, salt1, signatures);
         vm.stopPrank();
 
@@ -856,7 +857,7 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
 
         vm.prank(admin);
         vm.expectRevert(abi.encodeWithSelector(
-            InventoryPoolDefaultAccessManager01.SignatureThresholdTooHigh.selector,
+            IInventoryPoolAccessManager01.SignatureThresholdTooHigh.selector,
             tooHighThreshold,
             validators.length
         ));
@@ -875,7 +876,7 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
 
         vm.prank(admin);
         vm.expectRevert(abi.encodeWithSelector(
-            InventoryPoolDefaultAccessManager01.SignatureThresholdTooLow.selector,
+            IInventoryPoolAccessManager01.SignatureThresholdTooLow.selector,
             tooLowThreshold,
             validators.length
         ));
@@ -885,21 +886,21 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
     // Role management tests
     function testInventoryPoolDefaultAccessManager01_grantRole_reverts() public {
         vm.startPrank(admin);
-        vm.expectRevert(InventoryPoolDefaultAccessManager01.GrantRoleNotAllowed.selector);
+        vm.expectRevert(IInventoryPoolAccessManager01.GrantRoleNotAllowed.selector);
         accessManager.grantRole(VALIDATOR_ROLE, address(0x123));
         vm.stopPrank();
     }
 
     function testInventoryPoolDefaultAccessManager01_revokeRole_reverts() public {
         vm.startPrank(admin);
-        vm.expectRevert(InventoryPoolDefaultAccessManager01.RevokeRoleNotAllowed.selector);
+        vm.expectRevert(IInventoryPoolAccessManager01.RevokeRoleNotAllowed.selector);
         accessManager.revokeRole(VALIDATOR_ROLE, validator1);
         vm.stopPrank();
     }
 
     function testInventoryPoolDefaultAccessManager01_renounceRole_reverts() public {
         vm.startPrank(validator1);
-        vm.expectRevert(InventoryPoolDefaultAccessManager01.RenounceRoleNotAllowed.selector);
+        vm.expectRevert(IInventoryPoolAccessManager01.RenounceRoleNotAllowed.selector);
         accessManager.renounceRole(VALIDATOR_ROLE, validator1);
         vm.stopPrank();
     }
@@ -947,7 +948,7 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
         bytes[] memory signatures = getValidatorSignatures(digest);
 
         vm.startPrank(admin);
-        vm.expectRevert(abi.encodeWithSelector(InventoryPoolDefaultAccessManager01.BorrowerExists.selector, borrower));
+        vm.expectRevert(abi.encodeWithSelector(IInventoryPoolAccessManager01.BorrowerExists.selector, borrower));
         accessManager.addBorrower(borrower, salt1, signatures);
         vm.stopPrank();
     }
@@ -1006,7 +1007,7 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
         bytes[] memory signatures = getValidatorSignatures(digest);
 
         vm.startPrank(admin);
-        vm.expectRevert(abi.encodeWithSelector(InventoryPoolDefaultAccessManager01.BorrowerDoesNotExist.selector, nonBorrower));
+        vm.expectRevert(abi.encodeWithSelector(IInventoryPoolAccessManager01.BorrowerDoesNotExist.selector, nonBorrower));
         accessManager.removeBorrower(nonBorrower, salt1, signatures);
         vm.stopPrank();
     }

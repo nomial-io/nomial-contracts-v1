@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import {Test} from "forge-std/Test.sol";
 import {ValidateSignaturesMock} from "./mocks/ValidateSignaturesMock.sol";
-import {InventoryPoolDefaultAccessManager01} from "../src/owners/InventoryPoolDefaultAccessManager01.sol";
+import {IInventoryPoolAccessManager01} from "../src/interfaces/IInventoryPoolAccessManager01.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import "./Helper.sol";
 
@@ -68,7 +68,7 @@ contract ValidateSignaturesTest is Test, Helper {
 
         // Should revert with InvalidSignatureCount
         vm.expectRevert(abi.encodeWithSelector(
-            InventoryPoolDefaultAccessManager01.InvalidSignatureCount.selector,
+            IInventoryPoolAccessManager01.InvalidSignatureCount.selector,
             1,
             signatureThreshold
         ));
@@ -86,7 +86,7 @@ contract ValidateSignaturesTest is Test, Helper {
 
         // Should revert with ValidatorNotUnique
         vm.expectRevert(abi.encodeWithSelector(
-            InventoryPoolDefaultAccessManager01.ValidatorNotUnique.selector,
+            IInventoryPoolAccessManager01.ValidatorNotUnique.selector,
             validator1
         ));
         validateSignatures.validateSignatures(digest, signatures);
@@ -124,7 +124,7 @@ contract ValidateSignaturesTest is Test, Helper {
 
         // Second call with same digest should revert
         vm.expectRevert(abi.encodeWithSelector(
-            InventoryPoolDefaultAccessManager01.SignatureUsed.selector,
+            IInventoryPoolAccessManager01.SignatureUsed.selector,
             digest
         ));
         validateSignatures.validateSignatures(digest, signatures);
