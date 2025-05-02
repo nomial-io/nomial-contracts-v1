@@ -4,6 +4,7 @@ pragma solidity ^0.8.0;
 import {AccessControlEnumerable} from "@openzeppelin/contracts/access/extensions/AccessControlEnumerable.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
+import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IInventoryPoolAccessManager01} from "../interfaces/IInventoryPoolAccessManager01.sol";
@@ -21,7 +22,7 @@ import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol"
  * is required for all operations. The contract uses EIP-712 for secure message signing and
  * implements replay protection through signature tracking.
  */
-contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, IInventoryPoolAccessManager01, EIP712 {
+contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, IInventoryPoolAccessManager01, EIP712, ReentrancyGuardTransient {
     bytes32 public constant VALIDATOR_ROLE = keccak256("VALIDATOR_ROLE");
     bytes32 public constant BORROWER_ROLE = keccak256("BORROWER_ROLE");
 
@@ -59,7 +60,12 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, IInvent
      * @param borrowers Array of addresses to be granted the BORROWER_ROLE
      * @param signatureThreshold_ The minimum number of validator signatures required for operations
      */
-    constructor(address admin, address[] memory validators, address[] memory borrowers, uint16 signatureThreshold_) EIP712("InventoryPoolDefaultAccessManager01", "1") {
+    constructor(
+        address admin,
+        address[] memory validators,
+        address[] memory borrowers,
+        uint16 signatureThreshold_
+    ) EIP712("InventoryPoolDefaultAccessManager01", "1") {
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         if (uint16(validators.length) == 0) {
             revert ZeroValidatorsNotAllowed();
@@ -90,7 +96,7 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, IInvent
         uint expiry,
         bytes32 salt,
         bytes[] calldata signatures
-    ) external onlyRole(BORROWER_ROLE) {
+    ) external nonReentrant() onlyRole(BORROWER_ROLE) {
         address borrower = _msgSender();
 
         bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(BORROW_TYPEHASH, pool, borrower, amount, recipient, expiry, block.chainid, salt)));
@@ -114,7 +120,7 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, IInvent
         address borrower,
         bytes32 salt,
         bytes[] calldata signatures
-    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    ) external nonReentrant() onlyRole(DEFAULT_ADMIN_ROLE) {
         bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(FORGIVE_DEBT_TYPEHASH, pool, amount, borrower, salt)));
         _validateSignatures(digest, signatures);
 
@@ -129,7 +135,12 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, IInvent
      * @param salt Value to ensure digest is unique
      * @param signatures Array of validator signatures
      */
-    function updateBaseFee(OwnableParams01 paramsContract, uint newBaseFee, bytes32 salt, bytes[] calldata signatures) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function updateBaseFee(
+        OwnableParams01 paramsContract,
+        uint newBaseFee,
+        bytes32 salt,
+        bytes[] calldata signatures
+    ) external nonReentrant() onlyRole(DEFAULT_ADMIN_ROLE) {
         bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(UPDATE_BASE_FEE_TYPEHASH, paramsContract, newBaseFee, salt)));
         _validateSignatures(digest, signatures);
 
@@ -144,7 +155,12 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, IInvent
      * @param salt Value to ensure digest is unique
      * @param signatures Array of validator signatures
      */
-    function updateInterestRate(OwnableParams01 paramsContract, uint newInterestRate, bytes32 salt, bytes[] calldata signatures) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function updateInterestRate(
+        OwnableParams01 paramsContract,
+        uint newInterestRate,
+        bytes32 salt,
+        bytes[] calldata signatures
+    ) external nonReentrant() onlyRole(DEFAULT_ADMIN_ROLE) {
         bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(UPDATE_INTEREST_RATE_TYPEHASH, paramsContract, newInterestRate, salt)));
         _validateSignatures(digest, signatures);
 
@@ -159,7 +175,12 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, IInvent
      * @param salt Value to ensure digest is unique
      * @param signatures Array of validator signatures
      */
-    function updatePenaltyRate(OwnableParams01 paramsContract, uint newPenaltyRate, bytes32 salt, bytes[] calldata signatures) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function updatePenaltyRate(
+        OwnableParams01 paramsContract,
+        uint newPenaltyRate,
+        bytes32 salt,
+        bytes[] calldata signatures
+    ) external nonReentrant() onlyRole(DEFAULT_ADMIN_ROLE) {
         bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(UPDATE_PENALTY_RATE_TYPEHASH, paramsContract, newPenaltyRate, salt)));
         _validateSignatures(digest, signatures);
 
@@ -174,7 +195,12 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, IInvent
      * @param salt Value to ensure digest is unique
      * @param signatures Array of validator signatures
      */
-    function updatePenaltyPeriod(OwnableParams01 paramsContract, uint newPenaltyPeriod, bytes32 salt, bytes[] calldata signatures) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function updatePenaltyPeriod(
+        OwnableParams01 paramsContract,
+        uint newPenaltyPeriod,
+        bytes32 salt,
+        bytes[] calldata signatures
+    ) external nonReentrant() onlyRole(DEFAULT_ADMIN_ROLE) {
         bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(UPDATE_PENALTY_PERIOD_TYPEHASH, paramsContract, newPenaltyPeriod, salt)));
         _validateSignatures(digest, signatures);
 
@@ -189,7 +215,12 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, IInvent
      * @param salt Value to ensure digest is unique
      * @param signatures Array of validator signatures
      */
-    function upgradeParamsContract(InventoryPool01 pool, IInventoryPoolParams01 paramsContract, bytes32 salt, bytes[] calldata signatures) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function upgradeParamsContract(
+        InventoryPool01 pool,
+        IInventoryPoolParams01 paramsContract,
+        bytes32 salt,
+        bytes[] calldata signatures
+    ) external nonReentrant() onlyRole(DEFAULT_ADMIN_ROLE) {
         bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(UPGRADE_PARAMS_CONTRACT_TYPEHASH, pool, paramsContract, salt)));
         _validateSignatures(digest, signatures);
 
@@ -213,7 +244,7 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, IInvent
         uint newScaledReceivables,
         bytes32 salt,
         bytes[] calldata signatures
-    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    ) external nonReentrant() onlyRole(DEFAULT_ADMIN_ROLE) {
         bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(OVERWRITE_CORE_STATE_TYPEHASH, pool, newStoredAccInterestFactor, newLastAccumulatedInterestUpdate, newScaledReceivables, salt)));
         _validateSignatures(digest, signatures);
 
@@ -239,7 +270,7 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, IInvent
         address recipient,
         bytes32 salt,
         bytes[] calldata signatures
-    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    ) external nonReentrant() onlyRole(DEFAULT_ADMIN_ROLE) {
         bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(LIQUIDATE_BALANCE_TYPEHASH, pool, depositor, token, amount, recipient, salt)));
         _validateSignatures(digest, signatures);
 
@@ -265,7 +296,7 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, IInvent
         address recipient,
         bytes32 salt,
         bytes[] calldata signatures
-    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    ) external nonReentrant() onlyRole(DEFAULT_ADMIN_ROLE) {
         bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(LIQUIDATE_WITHDRAW_TYPEHASH, pool, nonce, depositor, amount, recipient, salt)));
         _validateSignatures(digest, signatures);
 
@@ -285,7 +316,7 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, IInvent
         uint newWithdrawPeriod,
         bytes32 salt,
         bytes[] calldata signatures
-    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    ) external nonReentrant() onlyRole(DEFAULT_ADMIN_ROLE) {
         bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(UPDATE_WITHDRAW_PERIOD_TYPEHASH, pool, newWithdrawPeriod, salt)));
         _validateSignatures(digest, signatures);
 
@@ -300,7 +331,12 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, IInvent
      * @param salt Unique value to prevent signature replay
      * @param signatures Array of validator signatures
      */
-    function transferOwnership(Ownable ownedContract, address newOwner, bytes32 salt, bytes[] calldata signatures) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function transferOwnership(
+        Ownable ownedContract,
+        address newOwner,
+        bytes32 salt,
+        bytes[] calldata signatures
+    ) external nonReentrant() onlyRole(DEFAULT_ADMIN_ROLE) {
         bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(TRANSFER_OWNERSHIP_TYPEHASH, ownedContract, newOwner, salt)));
         _validateSignatures(digest, signatures);
 
@@ -327,7 +363,12 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, IInvent
      * @param salt Value to ensure digest is unique
      * @param signatures Array of validator signatures
      */
-    function addValidator(address validator, uint16 newSignatureThreshold, bytes32 salt, bytes[] calldata signatures) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function addValidator(
+        address validator,
+        uint16 newSignatureThreshold,
+        bytes32 salt,
+        bytes[] calldata signatures
+    ) external nonReentrant() onlyRole(DEFAULT_ADMIN_ROLE) {
         bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(ADD_VALIDATOR_TYPEHASH, validator, newSignatureThreshold, salt)));
         _validateSignatures(digest, signatures);
 
@@ -343,7 +384,12 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, IInvent
      * @param salt Value to ensure digest is unique
      * @param signatures Array of validator signatures
      */
-    function removeValidator(address validator, uint16 newSignatureThreshold, bytes32 salt, bytes[] calldata signatures) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function removeValidator(
+        address validator,
+        uint16 newSignatureThreshold,
+        bytes32 salt,
+        bytes[] calldata signatures
+    ) external nonReentrant() onlyRole(DEFAULT_ADMIN_ROLE) {
         if (validatorCount() == 1) {
             revert ZeroValidatorsNotAllowed();
         }
@@ -362,7 +408,11 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, IInvent
      * @param salt Value to ensure digest is unique
      * @param signatures Array of validator signatures
      */
-    function addBorrower(address borrower, bytes32 salt, bytes[] calldata signatures) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function addBorrower(
+        address borrower,
+        bytes32 salt,
+        bytes[] calldata signatures
+    ) external nonReentrant() onlyRole(DEFAULT_ADMIN_ROLE) {
         bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(ADD_BORROWER_TYPEHASH, borrower, salt)));
         _validateSignatures(digest, signatures);
 
@@ -376,7 +426,11 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, IInvent
      * @param salt Value to ensure digest is unique
      * @param signatures Array of validator signatures
      */
-    function removeBorrower(address borrower, bytes32 salt, bytes[] calldata signatures) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function removeBorrower(
+        address borrower,
+        bytes32 salt,
+        bytes[] calldata signatures
+    ) external nonReentrant() onlyRole(DEFAULT_ADMIN_ROLE) {
         bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(REMOVE_BORROWER_TYPEHASH, borrower, salt)));
         _validateSignatures(digest, signatures);
 
@@ -390,7 +444,11 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, IInvent
      * @param salt Value to ensure digest is unique
      * @param signatures Array of validator signatures
      */
-    function setSignatureThreshold(uint16 newSignatureThreshold, bytes32 salt, bytes[] calldata signatures) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setSignatureThreshold(
+        uint16 newSignatureThreshold,
+        bytes32 salt,
+        bytes[] calldata signatures
+    ) external nonReentrant() onlyRole(DEFAULT_ADMIN_ROLE) {
         bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(SET_SIGNATURE_THRESHOLD_TYPEHASH, newSignatureThreshold, salt)));
         _validateSignatures(digest, signatures);
 
