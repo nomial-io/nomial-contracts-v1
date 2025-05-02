@@ -5,10 +5,12 @@ import {AccessControlEnumerable} from "@openzeppelin/contracts/access/extensions
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IInventoryPoolAccessManager01} from "../interfaces/IInventoryPoolAccessManager01.sol";
 import {IInventoryPoolParams01} from "../interfaces/IInventoryPoolParams01.sol";
 import {OwnableParams01} from "../OwnableParams01.sol";
 import {InventoryPool01} from "../InventoryPool01.sol";
+import {CollateralPool01} from "../CollateralPool01.sol";
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 
@@ -37,6 +39,9 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, IInvent
     bytes32 public constant OVERWRITE_CORE_STATE_TYPEHASH = keccak256("OverwriteCoreState(address pool,uint256 newStoredAccInterestFactor,uint256 newLastAccumulatedInterestUpdate,uint256 newScaledReceivables,bytes32 salt)");
     bytes32 public constant TRANSFER_OWNERSHIP_TYPEHASH = keccak256("TransferOwnership(address ownedContract,address newOwner,bytes32 salt)");
     bytes32 public constant SET_SIGNATURE_THRESHOLD_TYPEHASH = keccak256("SetSignatureThreshold(uint16 newSignatureThreshold,bytes32 salt)");
+    bytes32 public constant LIQUIDATE_BALANCE_TYPEHASH = keccak256("LiquidateBalance(address pool,address depositor,address token,uint256 amount,address recipient,bytes32 salt)");
+    bytes32 public constant LIQUIDATE_WITHDRAW_TYPEHASH = keccak256("LiquidateWithdraw(address pool,uint256 nonce,address depositor,uint256 amount,address recipient,bytes32 salt)");
+    bytes32 public constant UPDATE_WITHDRAW_PERIOD_TYPEHASH = keccak256("UpdateWithdrawPeriod(address pool,uint256 newWithdrawPeriod,bytes32 salt)");
 
     // Track used signatures to prevent replay
     mapping(bytes32 => bool) public usedSigHashes;
@@ -213,6 +218,78 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, IInvent
         _validateSignatures(digest, signatures);
 
         pool.overwriteCoreState(newStoredAccInterestFactor, newLastAccumulatedInterestUpdate, newScaledReceivables);
+    }
+
+    /**
+     * @notice Liquidates a depositor's balance of token from collateral pool
+     * @dev Requires signatures from the threshold number of validators. Can only be called by DEFAULT_ADMIN_ROLE
+     * @param pool The collateral pool to liquidate the balance from
+     * @param depositor The address of the depositor
+     * @param token The ERC20 token to liquidate
+     * @param amount The amount of tokens to liquidate
+     * @param recipient The address to receive the liquidated tokens
+     * @param salt Value to ensure digest is unique
+     * @param signatures Array of validator signatures
+     */
+    function liquidateBalance(
+        CollateralPool01 pool,
+        address depositor,
+        IERC20 token,
+        uint amount,
+        address recipient,
+        bytes32 salt,
+        bytes[] calldata signatures
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(LIQUIDATE_BALANCE_TYPEHASH, pool, depositor, token, amount, recipient, salt)));
+        _validateSignatures(digest, signatures);
+
+        pool.liquidateBalance(depositor, token, amount, recipient);
+    }
+
+    /**
+     * @notice Liquidates a pending withdrawal request from a collateral pool
+     * @dev Requires signatures from the threshold number of validators. Can only be called by DEFAULT_ADMIN_ROLE
+     * @param pool The collateral pool to liquidate the withdrawal from
+     * @param nonce The identifier of the withdrawal request to liquidate
+     * @param depositor The address whose withdrawal is being liquidated
+     * @param amount The amount of tokens to liquidate from the withdrawal
+     * @param recipient The address that will receive the liquidated tokens
+     * @param salt Value to ensure digest is unique
+     * @param signatures Array of validator signatures
+     */
+    function liquidateWithdraw(
+        CollateralPool01 pool,
+        uint nonce,
+        address depositor,
+        uint amount,
+        address recipient,
+        bytes32 salt,
+        bytes[] calldata signatures
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(LIQUIDATE_WITHDRAW_TYPEHASH, pool, nonce, depositor, amount, recipient, salt)));
+        _validateSignatures(digest, signatures);
+
+        pool.liquidateWithdraw(nonce, depositor, amount, recipient);
+    }
+
+    /**
+     * @notice Updates the withdrawal period in a collateral pool
+     * @dev Requires signatures from the threshold number of validators. Can only be called by DEFAULT_ADMIN_ROLE
+     * @param pool The collateral pool to update the withdrawal period for
+     * @param newWithdrawPeriod The new withdrawal period in seconds
+     * @param salt Value to ensure digest is unique
+     * @param signatures Array of validator signatures
+     */
+    function updateWithdrawPeriod(
+        CollateralPool01 pool,
+        uint newWithdrawPeriod,
+        bytes32 salt,
+        bytes[] calldata signatures
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(UPDATE_WITHDRAW_PERIOD_TYPEHASH, pool, newWithdrawPeriod, salt)));
+        _validateSignatures(digest, signatures);
+
+        pool.updateWithdrawPeriod(newWithdrawPeriod);
     }
 
     /**

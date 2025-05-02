@@ -6,6 +6,8 @@ import {IInventoryPoolAccessManager01} from "../src/interfaces/IInventoryPoolAcc
 import {InventoryPoolDefaultAccessManager01} from "../src/owners/InventoryPoolDefaultAccessManager01.sol";
 import {InventoryPool01} from "../src/InventoryPool01.sol";
 import {IInventoryPool01} from "../src/interfaces/IInventoryPool01.sol";
+import {CollateralPool01} from "../src/CollateralPool01.sol";
+import {ICollateralPool01} from "../src/interfaces/ICollateralPool01.sol";
 import {InventoryPoolDefaultAccessManagerDeployer01} from "../src/deployment/InventoryPoolDefaultAccessManagerDeployer01.sol";
 import {InventoryPoolDeployer01} from "../src/deployment/InventoryPoolDeployer01.sol";
 import {OwnableParamsDeployer01} from "../src/deployment/OwnableParamsDeployer01.sol";
@@ -23,6 +25,7 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
     address public constant validator = address(2);
     address public constant borrower = address(3);
     address public constant recipient = address(4);
+    address public constant depositor = address(5);
     bytes32 public constant salt1 = bytes32(uint256(1));
     bytes32 public constant salt2 = bytes32(uint256(2));
 
@@ -47,6 +50,7 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
     address public accessManagerAddr;
     InventoryPoolDefaultAccessManager01 public accessManager;
     OwnableParams01 public ownableParams;
+    CollateralPool01 public collateralPool;
 
     function setUp() public {
         setupAll();
@@ -78,6 +82,17 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
         vm.stopPrank();
 
         ownableParams = OwnableParams01(address(wethInventoryPool.params()));
+
+        collateralPool = new CollateralPool01(address(accessManager), 1 days);
+
+        vm.prank(WETH_WHALE);
+        WETH_ERC20.transfer(depositor, 1_000 * 10**18);
+
+        // Deposit WETH into collateral pool
+        vm.startPrank(depositor);
+        WETH_ERC20.approve(address(collateralPool), MAX_UINT);
+        collateralPool.deposit(WETH_ERC20, 1_000 * 10**18);
+        vm.stopPrank();
     }
 
     function testInventoryPoolDefaultAccessManager01_constructor() public {
@@ -1029,5 +1044,193 @@ contract InventoryPoolDefaultAccessManager01Test is Test, Helper {
         vm.prank(admin);
         vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, nonValidator, VALIDATOR_ROLE));
         accessManager.removeBorrower(borrower, salt1, signatures);
+    }
+
+    function testInventoryPoolDefaultAccessManager01_liquidateWithdraw_success() public {
+        vm.startPrank(depositor);
+        collateralPool.startWithdraw(WETH_ERC20, 1_000 * 10**18);
+        uint nonce = collateralPool.withdrawNonce(depositor);
+        vm.stopPrank();
+
+        uint amount = 1_000 * 10**18;
+
+        // Create signature for liquidating the withdrawal
+        bytes32 digest = accessManager.hashTypedData(keccak256(abi.encode(
+            accessManager.LIQUIDATE_WITHDRAW_TYPEHASH(),
+            collateralPool,
+            nonce,
+            depositor,
+            amount,
+            recipient,
+            salt1
+        )));
+        bytes[] memory signatures = getValidatorSignatures(digest);
+
+        // Execute liquidate withdraw
+        vm.startPrank(admin);
+        vm.expectEmit(true, true, true, true);
+        emit ICollateralPool01.WithdrawLiquidated(depositor, nonce, WETH_ERC20, amount, recipient);
+        accessManager.liquidateWithdraw(collateralPool, nonce, depositor, amount, recipient, salt1, signatures);
+        vm.stopPrank();
+
+        // Verify the tokens were transferred
+        assertEq(WETH_ERC20.balanceOf(recipient), amount, "Recipient should receive the liquidated tokens");
+    }
+
+    function testInventoryPoolDefaultAccessManager01_liquidateWithdraw_onlyCallableByAdmin() public {
+        CollateralPool01 collateralPool = new CollateralPool01(address(accessManager), 1 days);
+        
+        vm.startPrank(validator1);
+        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, validator1, accessManager.DEFAULT_ADMIN_ROLE()));
+        accessManager.liquidateWithdraw(collateralPool, 1, address(0x456), 100, address(0x789), salt1, new bytes[](0));
+        vm.stopPrank();
+    }
+
+    function testInventoryPoolDefaultAccessManager01_liquidateWithdraw_nonValidatorSignatureReverts() public {
+        CollateralPool01 collateralPool = new CollateralPool01(address(accessManager), 1 days);
+        uint nonce = 1;
+        address depositor = address(0x456);
+        uint amount = 100;
+        address recipient = address(0x789);
+
+        bytes32 digest = accessManager.hashTypedData(keccak256(abi.encode(
+            accessManager.LIQUIDATE_WITHDRAW_TYPEHASH(),
+            collateralPool,
+            nonce,
+            depositor,
+            amount,
+            recipient,
+            salt1
+        )));
+
+        uint256[] memory privKeys = new uint256[](2);
+        privKeys[0] = validator1_pk;
+        privKeys[1] = 0x999; // private key for non-validator
+        address nonValidator = vm.addr(privKeys[1]);
+
+        bytes[] memory signatures = getSignaturesFromKeys(digest, privKeys);
+
+        vm.startPrank(admin);
+        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, nonValidator, VALIDATOR_ROLE));
+        accessManager.liquidateWithdraw(collateralPool, nonce, depositor, amount, recipient, salt1, signatures);
+        vm.stopPrank();
+    }
+
+    function testInventoryPoolDefaultAccessManager01_updateWithdrawPeriod_success() public {
+        CollateralPool01 collateralPool = new CollateralPool01(address(accessManager), 1 days);
+        uint newWithdrawPeriod = 2 days;
+
+        bytes32 digest = accessManager.hashTypedData(keccak256(abi.encode(
+            accessManager.UPDATE_WITHDRAW_PERIOD_TYPEHASH(),
+            collateralPool,
+            newWithdrawPeriod,
+            salt1
+        )));
+        bytes[] memory signatures = getValidatorSignatures(digest);
+
+        vm.startPrank(admin);
+        vm.expectEmit(true, true, true, true);
+        emit ICollateralPool01.WithdrawPeriodUpdated(newWithdrawPeriod);
+        accessManager.updateWithdrawPeriod(collateralPool, newWithdrawPeriod, salt1, signatures);
+        vm.stopPrank();
+
+        assertEq(collateralPool.withdrawPeriod(), newWithdrawPeriod, "Withdraw period should be updated");
+    }
+
+    function testInventoryPoolDefaultAccessManager01_updateWithdrawPeriod_onlyCallableByAdmin() public {
+        CollateralPool01 collateralPool = new CollateralPool01(address(accessManager), 1 days);
+        
+        vm.startPrank(validator1);
+        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, validator1, accessManager.DEFAULT_ADMIN_ROLE()));
+        accessManager.updateWithdrawPeriod(collateralPool, 2 days, salt1, new bytes[](0));
+        vm.stopPrank();
+    }
+
+    function testInventoryPoolDefaultAccessManager01_updateWithdrawPeriod_nonValidatorSignatureReverts() public {
+        CollateralPool01 collateralPool = new CollateralPool01(address(accessManager), 1 days);
+        uint newWithdrawPeriod = 2 days;
+
+        bytes32 digest = accessManager.hashTypedData(keccak256(abi.encode(
+            accessManager.UPDATE_WITHDRAW_PERIOD_TYPEHASH(),
+            collateralPool,
+            newWithdrawPeriod,
+            salt1
+        )));
+
+        uint256[] memory privKeys = new uint256[](2);
+        privKeys[0] = validator1_pk;
+        privKeys[1] = 0x999; // private key for non-validator
+        address nonValidator = vm.addr(privKeys[1]);
+
+        bytes[] memory signatures = getSignaturesFromKeys(digest, privKeys);
+
+        vm.startPrank(admin);
+        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, nonValidator, VALIDATOR_ROLE));
+        accessManager.updateWithdrawPeriod(collateralPool, newWithdrawPeriod, salt1, signatures);
+        vm.stopPrank();
+    }
+
+    function testInventoryPoolDefaultAccessManager01_liquidateBalance_success() public {
+        uint amount = 1_000 * 10**18;
+
+        // Create signature for liquidating the balance
+        bytes32 digest = accessManager.hashTypedData(keccak256(abi.encode(
+            accessManager.LIQUIDATE_BALANCE_TYPEHASH(),
+            collateralPool,
+            depositor,
+            WETH_ERC20,
+            amount,
+            recipient,
+            salt1
+        )));
+        bytes[] memory signatures = getValidatorSignatures(digest);
+
+        // Execute liquidate balance
+        vm.startPrank(admin);
+        vm.expectEmit(true, true, true, true);
+        emit ICollateralPool01.BalanceLiquidated(depositor, WETH_ERC20, amount, recipient);
+        accessManager.liquidateBalance(collateralPool, depositor, WETH_ERC20, amount, recipient, salt1, signatures);
+        vm.stopPrank();
+
+        // Verify the tokens were transferred
+        assertEq(WETH_ERC20.balanceOf(recipient), amount, "Recipient should receive the liquidated tokens");
+    }
+
+    function testInventoryPoolDefaultAccessManager01_liquidateBalance_onlyCallableByAdmin() public {
+        CollateralPool01 collateralPool = new CollateralPool01(address(accessManager), 1 days);
+        IERC20 token = IERC20(address(0x123));
+        
+        vm.startPrank(validator1);
+        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, validator1, accessManager.DEFAULT_ADMIN_ROLE()));
+        accessManager.liquidateBalance(collateralPool, address(0x456), token, 100, address(0x789), salt1, new bytes[](0));
+        vm.stopPrank();
+    }
+
+    function testInventoryPoolDefaultAccessManager01_liquidateBalance_nonValidatorSignatureReverts() public {
+        CollateralPool01 collateralPool = new CollateralPool01(address(accessManager), 1 days);
+        IERC20 token = IERC20(address(0x123));
+        uint amount = 1_000 * 10**18;
+
+        bytes32 digest = accessManager.hashTypedData(keccak256(abi.encode(
+            accessManager.LIQUIDATE_BALANCE_TYPEHASH(),
+            collateralPool,
+            depositor,
+            token,
+            amount,
+            recipient,
+            salt1
+        )));
+
+        uint256[] memory privKeys = new uint256[](2);
+        privKeys[0] = validator1_pk;
+        privKeys[1] = 0x999; // private key for non-validator
+        address nonValidator = vm.addr(privKeys[1]);
+
+        bytes[] memory signatures = getSignaturesFromKeys(digest, privKeys);
+
+        vm.startPrank(admin);
+        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, nonValidator, VALIDATOR_ROLE));
+        accessManager.liquidateBalance(collateralPool, depositor, token, amount, recipient, salt1, signatures);
+        vm.stopPrank();
     }
 }
