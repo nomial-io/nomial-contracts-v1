@@ -41,7 +41,6 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, IInvent
     // Track used signatures to prevent replay
     mapping(bytes32 => bool) public usedSigHashes;
 
-    uint16 public validatorCount;
     uint16 public signatureThreshold;
 
     mapping(bytes32 => mapping(address => bool)) private _seenSigners;
@@ -57,8 +56,7 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, IInvent
      */
     constructor(address admin, address[] memory validators, address[] memory borrowers, uint16 signatureThreshold_) EIP712("InventoryPoolDefaultAccessManager01", "1") {
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
-        validatorCount = uint16(validators.length);
-        if (validatorCount == 0) {
+        if (uint16(validators.length) == 0) {
             revert ZeroValidatorsNotAllowed();
         }
         for (uint i = 0; i < validators.length; i++) {
@@ -257,7 +255,6 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, IInvent
         _validateSignatures(digest, signatures);
 
         _grantValidatorRole(validator);
-        validatorCount++;
         _setSignatureThreshold(newSignatureThreshold);
     }
 
@@ -270,7 +267,7 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, IInvent
      * @param signatures Array of validator signatures
      */
     function removeValidator(address validator, uint16 newSignatureThreshold, bytes32 salt, bytes[] calldata signatures) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        if (validatorCount == 1) {
+        if (validatorCount() == 1) {
             revert ZeroValidatorsNotAllowed();
         }
 
@@ -278,7 +275,6 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, IInvent
         _validateSignatures(digest, signatures);
 
         _revokeValidatorRole(validator);
-        validatorCount--;
         _setSignatureThreshold(newSignatureThreshold);
     }
 
@@ -322,6 +318,22 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, IInvent
         _validateSignatures(digest, signatures);
 
         _setSignatureThreshold(newSignatureThreshold);
+    }
+
+    /**
+     * @notice Returns the number of validators
+     * @return The number of validators
+     */
+    function validatorCount() public view returns (uint) {
+        return getRoleMemberCount(VALIDATOR_ROLE);
+    }
+
+    /**
+     * @notice Returns the number of borrowers
+     * @return The number of borrowers
+     */
+    function borrowerCount() public view returns (uint) {
+        return getRoleMemberCount(BORROWER_ROLE);
     }
 
     /**
@@ -386,10 +398,11 @@ contract InventoryPoolDefaultAccessManager01 is AccessControlEnumerable, IInvent
      * @param newSignatureThreshold The new threshold value to set
      */
     function _setSignatureThreshold(uint16 newSignatureThreshold) internal {
-        if (newSignatureThreshold <= validatorCount / 2) {
-            revert SignatureThresholdTooLow(newSignatureThreshold, validatorCount);
-        } else if (newSignatureThreshold > validatorCount) {
-            revert SignatureThresholdTooHigh(newSignatureThreshold, validatorCount);
+        uint validatorCount_ = validatorCount();
+        if (newSignatureThreshold <= validatorCount_ / 2) {
+            revert SignatureThresholdTooLow(newSignatureThreshold, validatorCount_);
+        } else if (newSignatureThreshold > validatorCount_) {
+            revert SignatureThresholdTooHigh(newSignatureThreshold, validatorCount_);
         }
         signatureThreshold = newSignatureThreshold;
 

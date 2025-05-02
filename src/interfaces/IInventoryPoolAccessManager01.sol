@@ -11,8 +11,8 @@ interface IInventoryPoolAccessManager01 is IAccessControl {
     event SignatureThresholdUpdated(uint16 newSignatureThreshold);
 
     error SignatureUsed(bytes32 sigHash);
-    error SignatureThresholdTooLow(uint16 newSignatureThreshold, uint16 validatorCount);
-    error SignatureThresholdTooHigh(uint16 newSignatureThreshold, uint16 validatorCount);
+    error SignatureThresholdTooLow(uint16 newSignatureThreshold, uint validatorCount);
+    error SignatureThresholdTooHigh(uint16 newSignatureThreshold, uint validatorCount);
     error GrantRoleNotAllowed();
     error RevokeRoleNotAllowed();
     error RenounceRoleNotAllowed();
@@ -26,7 +26,8 @@ interface IInventoryPoolAccessManager01 is IAccessControl {
 
     function VALIDATOR_ROLE() external view returns (bytes32);
     function BORROWER_ROLE() external view returns (bytes32);
-    function validatorCount() external view returns (uint16);
+    function validatorCount() external view returns (uint);
+    function borrowerCount() external view returns (uint);
     function signatureThreshold() external view returns (uint16);
     function usedSigHashes(bytes32) external view returns (bool);
     function domainSeparator() external view returns (bytes32);
