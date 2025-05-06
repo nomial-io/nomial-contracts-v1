@@ -2,55 +2,70 @@
 
 # Nomial Contracts v1
 
-Nomial V1 is a protocol for cross-chain inventory access, designed for intent solvers. It allows solvers to deposit ERC20 tokens as collateral on Arbitrum One and borrow against this collateral on multiple chains.
+Nomial V1 is a protocol for crosschain inventory access, designed for intent solvers. It allows solvers to deposit ERC20 tokens as collateral on a single chain and borrow against this collateral on multiple chains.
 
 ## Overview
 
-The Nomial V1 protocol facilitates cross-chain inventory access through two main components:
-1. **CollateralPool** - A single contract deployed on Arbitrum One where solvers deposit ERC20 tokens as collateral.
-2. **InventoryPools** - Multiple lending pools deployed across different blockchains, where Liquidity Providers (LPs) can deposit tokens to earn interest.
+The Nomial V1 protocol facilitates crosschain inventory access through two main components:
+1. **CollateralPool** - A single contract where solvers deposit ERC20 tokens as collateral.
+2. **InventoryPools** - Multiple lending pools deployed across different chains, where Liquidity Providers (LPs) can deposit assets and earn interest from borrowers (solvers)
 
 ## Architecture
 
 ### CollateralPool
+
+[CollateralPool01.sol](https://github.com/nomial-io/nomial-contracts-v1/blob/main/src/CollateralPool01.sol)
+
 - Accepts collateral deposits of any ERC20 token from solvers
 - Implements a time-locked withdrawal mechanism to allow time for liquidations
 - Has a two-step withdrawal process with configurable withdrawal period
-- Allows the owner (a multisig) to liquidate solver balances and pending withdrawals
-- Deployed on Arbitrum One blockchain
+- Allows an owner EOA or contract to liquidate solver balances and pending withdrawals
 
 ### InventoryPools
-- Deployed on blockchains where solver inventory is needed
-- Each pool manages a single token type
-- Utilization-based interest rate model based on Aave V3
-- Penalty interest is incurred for overdue loans, to disincentivize long-term borrowing
+
+[InventoryPool01.sol](https://github.com/nomial-io/nomial-contracts-v1/blob/main/src/InventoryPool01.sol)
+
+- An [ERC-4626](https://docs.openzeppelin.com/contracts/5.x/erc4626) token vault deployed on chains where solver inventory is needed
+- Each pool manages a single ERC20 asset
+- Interest paid by borrowers accrues proportionally to depositors in the vault
+- Penalty interest is incurred for overdue loans, to disincentivize long-term borrowing and incentivize borrowers to move assets back to the chain where the pool is deployed
+- Supports dynamic interest rate and penalty rate models through the [IInventoryPoolParams01](https://github.com/nomial-io/nomial-contracts-v1/blob/main/src/interfaces/IInventoryPoolParams01.sol) interface
+
+
+### Interest Rate Models
+
+Nomial V1 has two interest rate model implementations
+
+#### OwnableParams01
+
+[OwnableParams01.sol](https://github.com/nomial-io/nomial-contracts-v1/blob/main/src/OwnableParams01.sol)
+
+Allows an owner EOA or contract to set interest and penalty rate parameters. This allows for flexible, off-chain interest rate modeling that can be adjusted as needed.
+
+#### UtilizationBasedRateParams01
+
+[UtilizationBasedRateParams01.sol](https://github.com/nomial-io/nomial-contracts-v1/blob/main/src/UtilizationBasedRateParams01.sol)
+
+This models Aave V3’s default [Interest Rate Strategy](https://aave.com/docs/developers/smart-contracts/interest-rate-strategy), which is a 2-slope formula with an optimal utilization ratio. 
 
 
 ## Security Model
 
-### Owner Permissions
-Both CollateralPool and InventoryPools are controlled by a multisig smart account. This multisig has exclusive permissions to:
-- Liquidate solver balances and pending withdrawals in the CollateralPool
-- Initiate borrowing against solver collateral in InventoryPools
-- Update parameters like withdrawal periods and interest rates
+All Nomial V1 core contracts implement the simplest form of access control, [OpenZeppelin Ownable](https://docs.openzeppelin.com/contracts/5.x/access-control#ownership-and-ownable). This allows for more powerful access control models to be plugged in as needed.
 
-**Important**: All lending and liquidation operations are entirely controlled by the multisig owner. This is an intentional design choice for Nomial V1
+Nomial V1 has a default access control model, intended to be set as owner for all core contracts.
 
-### Cross-Chain Security
+#### InventoryPoolDefaultAccessManager01
 
-Multisig signers will provide signatures off-chain to solvers to initiate borrowing on their behalf.
+[InventoryPoolDefaultAccessManager01.sol](https://github.com/nomial-io/nomial-contracts-v1/blob/main/src/owners/InventoryPoolDefaultAccessManager01.sol)
 
-- InventoryPools are deployed independently on different chains
-- Chain ID verification ensures that multisig signed borrows are only valid on the correct chain
-- Solver collateral remains on Arbitrum One while LP funds are deployed to InventoryPools on different chains
+The default access manager extends [OpenZeppelin AccessControl](https://docs.openzeppelin.com/contracts/5.x/api/access#AccessControl) to add `VALIDATOR_ROLE` and `BORROWER_ROLE`, in addition to `DEFAULT_ADMIN_ROLE`.
 
-## Interest Rate Model
+All operations explicitly require the default admin to execute with the required threshold of validator signatures. In other words, the admin cannot execute any operation without sign-off from validators.
 
-The protocol uses a two-slope interest rate model similar to Aave v3 to determine LP returns:
-- Base rate applies to all utilization levels
-- Rate1 scales linearly up to optimal utilization
-- Rate2 scales linearly above optimal utilization
-- Additional penalty rate for overdue loans is added on top of base rate
+The one exception is the [borrow()](https://github.com/nomial-io/nomial-contracts-v1/blob/89ac640c332d06cebf92a9ea22b23a8733bdd501/src/owners/InventoryPoolDefaultAccessManager01.sol#L92) operation. This can be executed by any address with `BORROWER_ROLE`, with the required threshold of validator signatures.
+
+InventoryPoolDefaultAccessManager01 works with [CollateralPool01.sol](https://github.com/nomial-io/nomial-contracts-v1/blob/main/src/CollateralPool01.sol), [InventoryPool01.sol](https://github.com/nomial-io/nomial-contracts-v1/blob/main/src/InventoryPool01.sol), and [OwnableParams01.sol](https://github.com/nomial-io/nomial-contracts-v1/blob/main/src/OwnableParams01.sol).
 
 ## Development
 
